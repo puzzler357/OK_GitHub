@@ -19,6 +19,21 @@ export const tk = {
       calendar: "Senenama",
       settings: "Sazlamalar"
     },
+    login: {
+      subtitle: "Kadr hasabaty üçin platforma",
+      password: "Parol",
+      submit: "Girmek",
+      failed: "Nädogry email ýa-da parol",
+      devHint: "Dev gurnama: hasap ilkinji işe goýberilende döredilýär",
+      setupTitle: "Ilkinji işe goýberiş",
+      setupSubtitle: "Eýesiniň hasabyny dörediň — programmada deslapky parol göz öňünde tutulmaýar",
+      ownerName: "Eýesiniň ady",
+      newPassword: "Parol",
+      repeatPassword: "Paroly gaýtalaň",
+      passwordShort: "Parol azyndan 8 belgiden ybarat bolmaly",
+      passwordMismatch: "Parollar gabat gelmeýär",
+      create: "Döret we gir"
+    },
     common: {
       search: "Gözleg...",
       loading: "Ýüklenýär...",

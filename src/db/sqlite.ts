@@ -1,6 +1,5 @@
 import Database from 'better-sqlite3';
 import path from 'path';
-import bcrypt from 'bcryptjs';
 import { ENTITIES, allSchemaSql } from '../data/entities';
 import { seedValues } from '../data/seedData';
 
@@ -115,15 +114,10 @@ function countRows(table: string): number {
   return (db.prepare(`SELECT count(*) as c FROM ${table}`).get() as { c: number }).c;
 }
 
+// Учётная запись владельца намеренно не сеется: пароль по умолчанию, зашитый
+// в поставку, — это пароль, который знают все. При пустой таблице users
+// приложение показывает экран первичной настройки (см. /api/auth/status).
 function seed() {
-  const insertUser = db.prepare('INSERT INTO users (id, email, password_hash, role, name) VALUES (?, ?, ?, ?, ?)');
-
-  // Пароль по умолчанию — password123, меняется в «Настройках».
-  const defaultHash = bcrypt.hashSync('password123', 10);
-
-  // Однопользовательское приложение: единственная учётная запись владельца устройства.
-  insertUser.run('1', 'admin@global.tech', defaultHash, 'ADMIN', 'Иванов Иван');
-
   const insertEmp = db.prepare('INSERT INTO employees (id, full_name, position, department, status, hire_date, tab_number) VALUES (?, ?, ?, ?, ?, ?, ?)');
   insertEmp.run('1', 'Иванов Иван Иванович', 'Старший разработчик', 'IT', 'active', '2021-03-15', '0001');
   insertEmp.run('2', 'Петров Петр Петрович', 'Менеджер по продажам', 'Продажи', 'active', '2022-11-01', '0002');
@@ -175,9 +169,9 @@ function seed() {
 // только для скорости: без неё сброс системы был бы бессмысленным — демо-данные
 // возвращались бы при следующем запуске.
 if (db.prepare('SELECT value FROM meta WHERE key = ?').get(SEED_FLAG) === undefined) {
-  // Пустая база — сеем. Непустая (обновление со старой версии схемы) —
-  // только ставим отметку, чтобы не задваивать уже существующие записи.
-  if (countRows('users') === 0) {
+  // Пустая база — сеем демо-данные. Непустая (обновление со старой версии
+  // схемы) — только ставим отметку, чтобы не задваивать существующие записи.
+  if (countRows('employees') === 0 && countRows('users') === 0) {
     seed();
   }
   db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run(SEED_FLAG, new Date().toISOString());

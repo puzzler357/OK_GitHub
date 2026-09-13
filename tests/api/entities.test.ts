@@ -1,9 +1,10 @@
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
-import { api, startApi, stopApi } from './helpers';
+import { api, startApi, stopApi, ensureOwner, OWNER_EMAIL, OWNER_PASSWORD } from './helpers';
 import { ENTITIES, SEEDED_ENTITIES } from '../../src/data/entities';
 
 beforeAll(async () => {
   await startApi();
+  await ensureOwner();
 });
 afterAll(stopApi);
 
@@ -84,6 +85,21 @@ describe('посев экранов', () => {
   });
 });
 
+describe('первичная настройка', () => {
+  it('после создания владельца статус больше не требует настройки', async () => {
+    const { status, body } = await api('GET', '/api/auth/status');
+    expect(status).toBe(200);
+    expect(body.needsSetup).toBe(false);
+  });
+
+  it('повторная настройка отклоняется — владелец уже назначен', async () => {
+    const { status } = await api('POST', '/api/auth/setup', {
+      name: 'Второй', email: 'second@example.com', password: 'another-password',
+    });
+    expect(status).toBe(409);
+  });
+});
+
 describe('журнал аудита', () => {
   it('пишется вместе с изменением, а не по просьбе экрана', async () => {
     const before = (await api('GET', '/api/audit-log')).body.length;
@@ -103,10 +119,10 @@ describe('журнал аудита', () => {
   });
 
   it('фиксирует вход и неудачную попытку входа', async () => {
-    await api('POST', '/api/auth/login', { email: 'admin@global.tech', password: 'password123' });
+    await api('POST', '/api/auth/login', { email: OWNER_EMAIL, password: OWNER_PASSWORD });
     expect((await api('GET', '/api/audit-log')).body[0]).toMatchObject({ action: 'login', entity: 'auth' });
 
-    await api('POST', '/api/auth/login', { email: 'admin@global.tech', password: 'неверный' });
+    await api('POST', '/api/auth/login', { email: OWNER_EMAIL, password: 'неверный' });
     expect((await api('GET', '/api/audit-log')).body[0]).toMatchObject({ action: 'login_failed', entity: 'auth' });
   });
 

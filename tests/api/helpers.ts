@@ -47,3 +47,22 @@ export async function api<T = any>(
   }
   return { status: res.status, body: parsed };
 }
+
+/**
+ * Учётная запись владельца для тестов.
+ *
+ * Приложение поставляется без пароля по умолчанию, поэтому на чистой базе
+ * владельца сначала нужно создать. Функция идемпотентна: повторный вызов
+ * получает 409 «владелец уже назначен» и просто ничего не делает, поэтому
+ * её можно звать из любого файла тестов независимо от их порядка.
+ */
+export const OWNER_EMAIL = 'owner@example.com';
+export const OWNER_PASSWORD = 'test-owner-password';
+
+export async function ensureOwner(): Promise<void> {
+  await api('POST', '/api/auth/setup', {
+    name: 'Владелец Устройства',
+    email: OWNER_EMAIL,
+    password: OWNER_PASSWORD,
+  });
+}

@@ -1,7 +1,7 @@
 // Первой строкой: модуль подменяет DB_PATH до загрузки серверных модулей.
 import './resetDbPath';
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
-import { api, startApi, stopApi } from './helpers';
+import { api, startApi, stopApi, ensureOwner, OWNER_EMAIL, OWNER_PASSWORD } from './helpers';
 import { SEEDED_ENTITIES } from '../../src/data/entities';
 
 // Файл работает на собственной базе (см. resetDbPath.ts): он чистит все
@@ -9,11 +9,12 @@ import { SEEDED_ENTITIES } from '../../src/data/entities';
 // ломал бы любой тест, выполненный после него, — а порядок файлов vitest не
 // гарантирует, сортировка идёт по размеру, не по имени.
 
-const EMAIL = 'admin@global.tech';
-const PASSWORD = 'password123';
+const EMAIL = OWNER_EMAIL;
+const PASSWORD = OWNER_PASSWORD;
 
 beforeAll(async () => {
   await startApi();
+  await ensureOwner();
 });
 afterAll(stopApi);
 

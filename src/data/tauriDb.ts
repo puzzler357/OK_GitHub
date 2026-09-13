@@ -126,20 +126,13 @@ async function seedIfEmpty(db: Database) {
 
   // Непустая база (обновление со старой схемы) — только ставим отметку,
   // чтобы не задваивать уже существующие записи.
-  if (await count(db, 'users') > 0) {
+  if (await count(db, 'users') > 0 || await count(db, 'employees') > 0) {
     await db.execute('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', [SEED_FLAG, new Date().toISOString()]);
     return;
   }
 
-  // Однопользовательское приложение: единственная учётная запись владельца.
-  {
-    const hash = bcrypt.hashSync('password123', 10);
-    await db.execute(
-      'INSERT INTO users (id, email, password_hash, role, name) VALUES (?, ?, ?, ?, ?)',
-      ['1', 'admin@global.tech', hash, 'ADMIN', 'Иванов Иван'],
-    );
-  }
-
+  // Учётная запись владельца не сеется: пароль по умолчанию в поставке —
+  // это пароль, который знают все. Владелец задаёт его при первом запуске.
   {
     const emps: [string, string, string, string, string, string, string][] = [
       ['1', 'Иванов Иван Иванович', 'Старший разработчик', 'IT', 'active', '2021-03-15', '0001'],
@@ -486,6 +479,30 @@ export async function applyMovement(movement: any): Promise<{ id: string; moveme
 }
 
 // ---- Auth (локальная, без JWT) ----
+
+/** Есть ли владелец. Пока нет — показывается экран первичной настройки. */
+export async function authStatus(): Promise<{ needsSetup: boolean }> {
+  const db = await getDb();
+  const rows = await db.select<{ c: number }[]>('SELECT count(*) as c FROM users');
+  return { needsSetup: (rows[0]?.c ?? 0) === 0 };
+}
+
+export async function setupOwner(name: string, email: string, password: string): Promise<LoginResult> {
+  const db = await getDb();
+  const rows = await db.select<{ c: number }[]>('SELECT count(*) as c FROM users');
+  if ((rows[0]?.c ?? 0) > 0) throw new Error('Владелец уже назначен');
+  if (!email || !password || password.length < 8) throw new Error('Нужны email и пароль не короче 8 символов');
+
+  const id = '1';
+  await db.execute(
+    'INSERT INTO users (id, email, password_hash, role, name) VALUES (?, ?, ?, ?, ?)',
+    [id, email, bcrypt.hashSync(password, 10), 'ADMIN', name || email],
+  );
+  await audit(db, 'setup', 'auth', id, email);
+
+  return { user: { id, email, name: name || email, role: 'ADMIN' }, token: 'local' };
+}
+
 export async function login(email: string, password: string): Promise<LoginResult> {
   const db = await getDb();
   const rows = await db.select<any[]>('SELECT * FROM users WHERE email = ?', [email]);

@@ -19,6 +19,21 @@ export const en = {
       calendar: "Calendar",
       settings: "Settings"
     },
+    login: {
+      subtitle: "HR management platform",
+      password: "Password",
+      submit: "Sign in",
+      failed: "Invalid email or password",
+      devHint: "Dev build: the account is created on first run",
+      setupTitle: "First run",
+      setupSubtitle: "Create the owner account — the app ships without a default password",
+      ownerName: "Owner name",
+      newPassword: "Password",
+      repeatPassword: "Repeat password",
+      passwordShort: "Password must be at least 8 characters",
+      passwordMismatch: "Passwords do not match",
+      create: "Create and sign in"
+    },
     common: {
       search: "Search...",
       loading: "Loading...",

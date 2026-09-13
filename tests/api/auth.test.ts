@@ -1,11 +1,12 @@
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
-import { api, startApi, stopApi } from './helpers';
+import { api, startApi, stopApi, ensureOwner, OWNER_EMAIL, OWNER_PASSWORD } from './helpers';
 
-const EMAIL = 'admin@global.tech';
-const PASSWORD = 'password123';
+const EMAIL = OWNER_EMAIL;
+const PASSWORD = OWNER_PASSWORD;
 
 beforeAll(async () => {
   await startApi();
+  await ensureOwner();
 });
 afterAll(stopApi);
 

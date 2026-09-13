@@ -19,6 +19,21 @@ export const ru = {
       calendar: "Календарь",
       settings: "Настройки"
     },
+    login: {
+      subtitle: "Платформа для кадрового учёта",
+      password: "Пароль",
+      submit: "Войти",
+      failed: "Неверный email или пароль",
+      devHint: "Dev-сборка: учётная запись создаётся при первом запуске",
+      setupTitle: "Первый запуск",
+      setupSubtitle: "Создайте учётную запись владельца — пароль по умолчанию в приложении не предусмотрен",
+      ownerName: "Имя владельца",
+      newPassword: "Пароль",
+      repeatPassword: "Повторите пароль",
+      passwordShort: "Пароль должен быть не короче 8 символов",
+      passwordMismatch: "Пароли не совпадают",
+      create: "Создать и войти"
+    },
     common: {
       search: "Поиск...",
       loading: "Загрузка...",

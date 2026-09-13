@@ -31,6 +31,33 @@ function audit(action: string, entity: string, entityId?: string | null, diff?: 
 }
 
 // API Auth
+// Есть ли владелец. Пока нет — приложение показывает экран первичной
+// настройки вместо входа: пароль по умолчанию в поставке не предусмотрен.
+app.get('/api/auth/status', (_req, res) => {
+  const { c } = db.prepare('SELECT count(*) as c FROM users').get() as { c: number };
+  res.json({ needsSetup: c === 0 });
+});
+
+app.post('/api/auth/setup', (req, res) => {
+  const { name, email, password } = req.body ?? {};
+
+  const { c } = db.prepare('SELECT count(*) as c FROM users').get() as { c: number };
+  if (c > 0) return res.status(409).json({ error: 'Владелец уже назначен' });
+
+  if (!email || !password || String(password).length < 8) {
+    return res.status(400).json({ error: 'Нужны email и пароль не короче 8 символов' });
+  }
+
+  const id = '1';
+  db.prepare('INSERT INTO users (id, email, password_hash, role, name) VALUES (?, ?, ?, ?, ?)')
+    .run(id, email, bcrypt.hashSync(password, 10), 'ADMIN', name || email);
+
+  audit('setup', 'auth', id, email);
+
+  const token = jwt.sign({ id, role: 'ADMIN' }, JWT_SECRET, { expiresIn: '7d' });
+  res.json({ user: { id, email, name: name || email, role: 'ADMIN' }, token });
+});
+
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;

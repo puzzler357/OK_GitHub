@@ -179,6 +179,13 @@ export const applyMovement = (movement: any): Promise<{ id: string; movement: an
     : fetch('/api/movements/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(movement) }).then(jsonOrThrow);
 
 // ---- Auth ----
+export const authStatus = (): Promise<{ needsSetup: boolean }> =>
+  isTauri ? tauri.authStatus() : fetch('/api/auth/status').then(jsonOrThrow);
+
+export const setupOwner = (name: string, email: string, password: string): Promise<LoginResult> =>
+  isTauri ? tauri.setupOwner(name, email, password)
+    : fetch('/api/auth/setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password }) }).then(jsonOrThrow);
+
 export const login = (email: string, password: string): Promise<LoginResult> =>
   isTauri ? tauri.login(email, password)
     : fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }).then(jsonOrThrow);
