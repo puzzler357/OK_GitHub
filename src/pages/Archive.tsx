@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useTranslation } from 'react-i18next';
 import { useDatabaseStore } from '../store/useDatabaseStore';
 import { useMoney } from '../lib/money';
-import { Download, Filter, Printer, FileText } from 'lucide-react';
+import { Download, Printer, FileText } from 'lucide-react';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 import html2pdf from 'html2pdf.js';
@@ -102,6 +102,7 @@ export default function Archive() {
 
   const handleExportPDF = () => {
     const element = document.getElementById('archive-table-container');
+    if (!element) return;
     const opt = {
       margin:       1,
       filename:     `archive_${selectedYear}.pdf`,

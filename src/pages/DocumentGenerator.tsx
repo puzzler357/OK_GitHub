@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDatabaseStore } from '../store/useDatabaseStore';
 import { useMoney } from '../lib/money';
 import { canonicalName, renderTemplate } from '../lib/templateVars';
 import type { TemplateValues } from '../lib/templateVars';
-import { FileText, Download, Printer, User } from 'lucide-react';
+import { FileText, Download, Printer } from 'lucide-react';
 import { generateDocx } from '../lib/docx';
 import { useAppStore } from '../store/useAppStore';
 

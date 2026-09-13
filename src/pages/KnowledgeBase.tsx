@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, Book, FileText, ChevronRight, Hash, Bookmark, ArrowLeft, Save, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -7,6 +7,7 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
 import { useDatabaseStore, TABLES } from '../store/useDatabaseStore';
 import type { KbArticle } from '../store/useDatabaseStore';
+import { clickable } from '../lib/a11y';
 
 const MenuBar = ({ editor }: { editor: any }) => {
   const { t } = useTranslation();
@@ -125,9 +126,9 @@ export default function KnowledgeBase() {
     },
   });
 
-  useEffect(() => {
-    if (!articleCategory && kbCategories.length > 0) setArticleCategory(kbCategories[0].id);
-  }, [kbCategories, articleCategory]);
+  // Категория по умолчанию выводится из справочника, а не проставляется
+  // эффектом: лишний проход рендера здесь ни к чему.
+  const currentCategory = articleCategory || kbCategories[0]?.id || '';
 
   const categoryName = (id?: string) => kbCategories.find(c => c.id === id)?.name ?? t('kb.general');
 
@@ -142,7 +143,7 @@ export default function KnowledgeBase() {
     const now = new Date().toISOString().split('T')[0];
 
     await createIn<KbArticle>(TABLES.kbArticles, {
-      categoryId: articleCategory || undefined,
+      categoryId: currentCategory || undefined,
       title: articleTitle,
       contentHtml: editor?.getHTML() || '',
       reads: 0,
@@ -201,7 +202,7 @@ export default function KnowledgeBase() {
             <div>
               <label className="block text-sm font-medium text-muted mb-2">{t('kb.category')}</label>
               <select
-                value={articleCategory}
+                value={currentCategory}
                 onChange={e => setArticleCategory(e.target.value)}
                 className="w-full bg-app border border-line rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 transition-colors"
               >
@@ -287,7 +288,7 @@ export default function KnowledgeBase() {
           return (
             <div
               key={cat.id}
-              onClick={() => setSelectedCategoryId(isSelected ? null : cat.id)}
+              {...clickable(() => setSelectedCategoryId(isSelected ? null : cat.id), cat.name)}
               className={`${isSelected ? 'bg-surface-3 border-accent-500' : 'bg-surface border-line'} border hover:border-strong rounded-2xl p-6 cursor-pointer transition-colors group`}
             >
               <div className="w-12 h-12 bg-surface-3 text-accent-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -304,7 +305,7 @@ export default function KnowledgeBase() {
         <h3 className="text-xl font-semibold text-primary mb-4">{searchQuery || selectedCategoryId ? t('kb.searchResults') : t('kb.popular')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredArticles.map(article => (
-            <div key={article.id} onClick={() => openArticle(article.id, article.reads)} className="bg-surface-2 border border-line hover:bg-surface-hover rounded-xl p-4 flex items-center justify-between cursor-pointer transition-colors">
+            <div key={article.id} {...clickable(() => openArticle(article.id, article.reads), article.title)} className="bg-surface-2 border border-line hover:bg-surface-hover rounded-xl p-4 flex items-center justify-between cursor-pointer transition-colors">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 bg-surface-3 rounded-lg flex items-center justify-center text-muted">
                   <FileText className="w-5 h-5" />

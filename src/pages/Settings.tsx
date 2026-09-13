@@ -9,6 +9,7 @@ import { useMoney } from '../lib/money';
 import type { CurrencyDecimals, CurrencyPosition, ThousandsSeparator } from '../lib/money';
 import * as api from '../data';
 import { Settings as SettingsIcon, ShieldCheck, Key, Shield, Database, Link, Palette, Eye, Download, RefreshCw, Check, Sun, Moon, Monitor } from 'lucide-react';
+import { clickable } from '../lib/a11y';
 
 export default function Settings() {
   const [resetPassword, setResetPassword] = useState('');
@@ -785,9 +786,9 @@ export default function Settings() {
                     }[color];
                     
                     return (
-                      <div 
+                      <div
                         key={color}
-                        onClick={() => { setAccentColor(color); logSetting('accentColor', color); }}
+                        {...clickable(() => { setAccentColor(color); logSetting('accentColor', color); }, color)}
                         className={`w-8 h-8 rounded-full cursor-pointer hover:scale-110 transition-transform flex items-center justify-center text-white ${colorClasses} ${
                           accentColor === color ? 'ring-2 ring-offset-2 ring-offset-[var(--surface-2)]' : ''
                         }`}
@@ -804,9 +805,9 @@ export default function Settings() {
                 <p className="text-xs text-muted mb-6">{t('settings.appearance.densityHint')}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {(['compact', 'standard', 'spacious'] as const).map(d => (
-                    <div 
+                    <div
                       key={d}
-                      onClick={() => { setDensity(d); logSetting('density', d); }}
+                      {...clickable(() => { setDensity(d); logSetting('density', d); }, d)}
                       className={`rounded-xl p-4 cursor-pointer transition-colors ${
                         density === d 
                           ? 'border border-accent-500 bg-accent-500/10' 
@@ -827,24 +828,24 @@ export default function Settings() {
               <div className="border border-line rounded-2xl p-6 bg-surface-2">
                 <h3 className="text-sm font-medium mb-6 text-primary">{t('settings.appearance.fontSize')}</h3>
                 <div className="flex items-center gap-4 px-2">
-                  <span className="text-xs font-medium text-muted cursor-pointer" onClick={() => { setFontSize('small'); logSetting('fontSize', 'small'); }}>A</span>
+                  <span className="text-xs font-medium text-muted cursor-pointer" {...clickable(() => { setFontSize('small'); logSetting('fontSize', 'small'); }, 'A')}>A</span>
                   <div className="flex-1 relative h-2 bg-surface-3 rounded-full flex items-center">
                     <div className="absolute top-0 left-0 h-full bg-accent-500 rounded-full transition-all" style={{ width: fontSize === 'small' ? '0%' : fontSize === 'standard' ? '50%' : '100%' }}></div>
                     
-                    <div 
-                      onClick={() => { setFontSize('small'); logSetting('fontSize', 'small'); }}
+                    <div
+                      {...clickable(() => { setFontSize('small'); logSetting('fontSize', 'small'); }, 'small')}
                       className={`absolute left-0 w-4 h-4 rounded-full cursor-pointer -translate-x-1/2 ${fontSize === 'small' ? 'bg-accent-400 ring-4 ring-accent-500/30 shadow-sm' : 'bg-transparent'}`}
                     ></div>
-                    <div 
-                      onClick={() => { setFontSize('standard'); logSetting('fontSize', 'standard'); }}
+                    <div
+                      {...clickable(() => { setFontSize('standard'); logSetting('fontSize', 'standard'); }, 'standard')}
                       className={`absolute left-1/2 w-4 h-4 rounded-full cursor-pointer -translate-x-1/2 ${fontSize === 'standard' ? 'bg-accent-400 ring-4 ring-accent-500/30 shadow-sm' : 'bg-transparent'}`}
                     ></div>
-                    <div 
-                      onClick={() => { setFontSize('large'); logSetting('fontSize', 'large'); }}
+                    <div
+                      {...clickable(() => { setFontSize('large'); logSetting('fontSize', 'large'); }, 'large')}
                       className={`absolute left-full w-4 h-4 rounded-full cursor-pointer -translate-x-1/2 ${fontSize === 'large' ? 'bg-accent-400 ring-4 ring-accent-500/30 shadow-sm' : 'bg-transparent'}`}
                     ></div>
                   </div>
-                  <span className="text-lg font-medium text-muted cursor-pointer" onClick={() => { setFontSize('large'); logSetting('fontSize', 'large'); }}>A</span>
+                  <span className="text-lg font-medium text-muted cursor-pointer" {...clickable(() => { setFontSize('large'); logSetting('fontSize', 'large'); }, 'A')}>A</span>
                 </div>
                 <div className="flex justify-between mt-3 px-2">
                   <span className="text-xs text-muted">{t('settings.appearance.small')}</span>

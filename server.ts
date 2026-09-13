@@ -258,7 +258,7 @@ app.post('/api/backup/restore', (req, res) => {
 });
 
 // API Employees
-app.get('/api/employees', (req, res) => {
+app.get('/api/employees', (_req, res) => {
   const employees = db.prepare('SELECT * FROM employees').all().map((e: any) => ({
     id: e.id,
     fullName: e.full_name,
@@ -323,7 +323,7 @@ app.delete('/api/employees/:id', (req, res) => {
 });
 
 // API Departments
-app.get('/api/departments', (req, res) => {
+app.get('/api/departments', (_req, res) => {
   const deps = db.prepare('SELECT * FROM departments').all().map((d: any) => ({
     id: d.id, name: d.name, parentId: d.parent_id
   }));
@@ -348,7 +348,7 @@ app.delete('/api/departments/:id', (req, res) => {
 });
 
 // API Positions
-app.get('/api/positions', (req, res) => {
+app.get('/api/positions', (_req, res) => {
   const pos = db.prepare('SELECT * FROM positions').all().map((p: any) => ({
     id: p.id, departmentId: p.department_id, title: p.title, maxCount: p.max_count, salary: p.salary
   }));
@@ -374,7 +374,7 @@ app.delete('/api/positions/:id', (req, res) => {
 });
 
 // API Templates
-app.get('/api/templates', (req, res) => {
+app.get('/api/templates', (_req, res) => {
   const templates = db.prepare('SELECT * FROM templates').all().map((t: any) => ({
     id: t.id,
     name: t.name,
@@ -502,7 +502,7 @@ export async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

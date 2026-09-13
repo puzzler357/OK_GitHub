@@ -1,9 +1,9 @@
-import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { clickable } from '../lib/a11y';
 
 // Схема только для вывода типа формы; сообщения валидации задаются
 // локализованной схемой внутри компонента (см. localizedSchema).
@@ -57,9 +57,9 @@ export default function EmployeeForm({ initialData, onClose, onSubmit }: Employe
   return (
     <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
       {/* Backdrop */}
-      <div 
+      <div
         className="absolute inset-0 bg-surface backdrop-blur-sm transition-opacity"
-        onClick={onClose}
+        {...clickable(onClose, t('common.close'))}
       />
       
       {/* Drawer */}

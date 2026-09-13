@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Users, TrendingDown, ClipboardList, BarChart as BarChartIcon, Download, Save } from 'lucide-react';
 import { exportToExcel } from '../lib/excel';
@@ -46,7 +46,6 @@ export default function Reports() {
   }, [fetchArchives, period.year]);
 
   const employeeName = (id: string) => employees.find(e => e.id === id)?.fullName ?? '—';
-  const departmentName = (id: string) => departments.find(d => d.id === id)?.name ?? '—';
 
   const statusLabel = (status: string) =>
     status === 'active' ? t('employees.status.active')
@@ -227,13 +226,16 @@ export default function Reports() {
     return Array.from(keys);
   }, [sourceRows]);
 
-  // Поля источника меняются — выбранные сбрасываем, иначе в отчёт попали бы
-  // колонки, которых в новом источнике нет.
-  useEffect(() => {
-    setSelectedFields(availableFields.slice(0, 5));
-    setFilterField('');
-    setGroupBy('');
-  }, [source]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Выбор полей выводится, а не сбрасывается эффектом: при смене источника
+  // колонок из прежнего набора в нём просто не остаётся, а пустой выбор
+  // заполняется первыми пятью полями нового источника.
+  const activeFields = useMemo(() => {
+    const kept = selectedFields.filter(field => availableFields.includes(field));
+    return kept.length > 0 ? kept : availableFields.slice(0, 5);
+  }, [selectedFields, availableFields]);
+
+  const activeFilterField = availableFields.includes(filterField) ? filterField : '';
+  const activeGroupBy = activeFields.includes(groupBy) ? groupBy : '';
 
   const builderRows = useMemo(() => {
     let rows = sourceRows;
@@ -241,25 +243,25 @@ export default function Reports() {
     if (filterValue) {
       const needle = filterValue.toLowerCase();
       rows = rows.filter(row => {
-        const fields = filterField ? [filterField] : Object.keys(row);
+        const fields = activeFilterField ? [activeFilterField] : Object.keys(row);
         return fields.some(f => String(row[f] ?? '').toLowerCase().includes(needle));
       });
     }
 
     const projected = rows.map(row => {
       const out: Record<string, string | number> = {};
-      for (const field of selectedFields) {
+      for (const field of activeFields) {
         const value = row[field];
         out[field] = typeof value === 'object' && value !== null ? JSON.stringify(value) : (value as any) ?? '';
       }
       return out;
     });
 
-    if (!groupBy || !selectedFields.includes(groupBy)) return projected;
+    if (!activeGroupBy) return projected;
     // Группировка — сортировка по ключу: строки одной группы идут подряд,
     // а сам ключ остаётся колонкой, поэтому выгрузка не теряет структуру.
-    return projected.slice().sort((a, b) => String(a[groupBy]).localeCompare(String(b[groupBy])));
-  }, [sourceRows, filterField, filterValue, selectedFields, groupBy]);
+    return projected.slice().sort((a, b) => String(a[activeGroupBy]).localeCompare(String(b[activeGroupBy])));
+  }, [sourceRows, activeFilterField, filterValue, activeFields, activeGroupBy]);
 
   const toggleField = (field: string) => {
     setSelectedFields(prev => (prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]));
@@ -269,7 +271,7 @@ export default function Reports() {
     if (!presetName.trim()) return;
     await createIn<ReportPreset>(TABLES.reportPresets, {
       name: presetName.trim(),
-      config: JSON.stringify({ source, selectedFields, filterField, filterValue, groupBy }),
+      config: JSON.stringify({ source, selectedFields: activeFields, filterField: activeFilterField, filterValue, groupBy: activeGroupBy }),
     });
     setPresetName('');
   };
@@ -277,14 +279,13 @@ export default function Reports() {
   const applyPreset = (preset: ReportPreset) => {
     try {
       const config = JSON.parse(preset.config);
+      // Порядок больше не важен: выбор полей выводится, а не восстанавливается
+      // эффектом, поэтому setTimeout здесь не нужен.
       setSource(config.source ?? 'employees');
-      // Поля выставляем после источника: эффект сброса уже отработает.
-      setTimeout(() => {
-        setSelectedFields(config.selectedFields ?? []);
-        setFilterField(config.filterField ?? '');
-        setFilterValue(config.filterValue ?? '');
-        setGroupBy(config.groupBy ?? '');
-      }, 0);
+      setSelectedFields(config.selectedFields ?? []);
+      setFilterField(config.filterField ?? '');
+      setFilterValue(config.filterValue ?? '');
+      setGroupBy(config.groupBy ?? '');
     } catch {
       // Набор с испорченным JSON просто не применяем.
     }
@@ -404,7 +405,7 @@ export default function Reports() {
           </div>
           <div>
             <label className="block text-xs font-medium text-muted mb-2">{t('reports.filterField')}</label>
-            <select value={filterField} onChange={(e) => setFilterField(e.target.value)} className={control}>
+            <select value={activeFilterField} onChange={(e) => setFilterField(e.target.value)} className={control}>
               <option value="">{t('reports.anyField')}</option>
               {availableFields.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
@@ -422,7 +423,7 @@ export default function Reports() {
               <button
                 key={field}
                 onClick={() => toggleField(field)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${selectedFields.includes(field) ? 'bg-accent-500/20 text-accent-400 border-accent-500/40' : 'bg-surface-3 text-muted border-line hover:bg-surface-hover'}`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${activeFields.includes(field) ? 'bg-accent-500/20 text-accent-400 border-accent-500/40' : 'bg-surface-3 text-muted border-line hover:bg-surface-hover'}`}
               >
                 {field}
               </button>
@@ -433,9 +434,9 @@ export default function Reports() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div>
             <label className="block text-xs font-medium text-muted mb-2">{t('reports.groupBy')}</label>
-            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} className={control}>
+            <select value={activeGroupBy} onChange={(e) => setGroupBy(e.target.value)} className={control}>
               <option value="">{t('reports.noGrouping')}</option>
-              {selectedFields.map(f => <option key={f} value={f}>{f}</option>)}
+              {activeFields.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
           </div>
           <div>
@@ -488,13 +489,13 @@ export default function Reports() {
       <div className="p-6 overflow-auto custom-scrollbar flex-1">
         <p className="text-xs text-muted mb-3">{t('reports.rowsFound', { n: builderRows.length })}</p>
 
-        {selectedFields.length === 0 ? (
+        {activeFields.length === 0 ? (
           <p className="text-sm text-muted text-center py-8">{t('reports.selectFields')}</p>
         ) : (
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-muted uppercase bg-surface-3">
               <tr>
-                {selectedFields.map(field => (
+                {activeFields.map(field => (
                   <th key={field} className="p-table text-table">{field}</th>
                 ))}
               </tr>
@@ -502,14 +503,14 @@ export default function Reports() {
             <tbody>
               {builderRows.slice(0, 200).map((row, i) => (
                 <tr key={i} className="border-b border-line hover:bg-surface-hover">
-                  {selectedFields.map(field => (
+                  {activeFields.map(field => (
                     <td key={field} className="p-table text-table text-muted">{row[field]}</td>
                   ))}
                 </tr>
               ))}
               {builderRows.length === 0 && (
                 <tr>
-                  <td colSpan={selectedFields.length} className="p-table text-table text-center text-muted py-8">
+                  <td colSpan={activeFields.length} className="p-table text-table text-center text-muted py-8">
                     {t('reports.noData')}
                   </td>
                 </tr>

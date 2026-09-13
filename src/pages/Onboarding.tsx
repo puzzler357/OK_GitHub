@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CheckSquare, Square, UserPlus, UserMinus, ArrowRight, X } from 'lucide-react';
 import { useDatabaseStore, TABLES } from '../store/useDatabaseStore';
@@ -32,14 +32,14 @@ export default function Onboarding() {
     return new Set(tasks.map(task => task.employeeId)).size;
   };
 
-  // Как только меняется вкладка, выбранный сотрудник может исчезнуть из списка.
-  useEffect(() => {
-    if (!employeeIds.includes(selectedEmployeeId)) {
-      setSelectedEmployeeId(employeeIds[0] ?? '');
-    }
-  }, [employeeIds, selectedEmployeeId]);
+  // При смене вкладки выбранный сотрудник может исчезнуть из списка. Раньше
+  // это чинил эффект с setState — лишний проход рендера; теперь значение
+  // просто выводится из данных.
+  const currentEmployeeId = employeeIds.includes(selectedEmployeeId)
+    ? selectedEmployeeId
+    : employeeIds[0] ?? '';
 
-  const tasks = tasksOfKind.filter(task => task.employeeId === selectedEmployeeId);
+  const tasks = tasksOfKind.filter(task => task.employeeId === currentEmployeeId);
   const selectedTask = selectedTaskId ? tasks.find(task => task.id === selectedTaskId) ?? null : null;
 
   const employeeName = (id: string) => employees.find(e => e.id === id)?.fullName ?? '—';
@@ -156,7 +156,7 @@ export default function Onboarding() {
               {activeTab === 'onboarding' ? t('onboarding.newEmployee') : t('onboarding.leaving')}:
             </span>
             <select
-              value={selectedEmployeeId}
+              value={currentEmployeeId}
               onChange={(e) => setSelectedEmployeeId(e.target.value)}
               className="bg-app border border-line rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 text-primary"
             >

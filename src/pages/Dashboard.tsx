@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Users, FileText, Network, BarChart as BarChartIcon, Gift } from 'lucide-react';
@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useDatabaseStore } from '../store/useDatabaseStore';
 import { useMoney } from '../lib/money';
 import { payrollTotal } from '../lib/payroll';
+import { clickable } from '../lib/a11y';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#3b82f6', '#ec4899'];
 
@@ -27,7 +28,7 @@ export default function Dashboard() {
     
     return employees.filter(emp => {
       if (!emp.birthDate) return false;
-      const [year, month, day] = emp.birthDate.split('-');
+      const [, month, day] = emp.birthDate.split('-');
       return parseInt(month, 10) === currentMonth && parseInt(day, 10) === currentDay;
     });
   }, [employees]);
@@ -48,8 +49,8 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div 
-          onClick={() => navigate('/employees')}
+        <div
+          {...clickable(() => navigate('/employees'))}
           className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-2xl p-6 shadow-sm cursor-pointer hover:border-accent-500/50 hover:shadow-md transition-all"
         >
           <div className="flex items-center justify-between mb-4">
@@ -60,8 +61,8 @@ export default function Dashboard() {
           <p className="text-sm text-emerald-600 mt-2">{t('dashboard.totalInBase')}</p>
         </div>
         
-        <div 
-          onClick={() => navigate('/recruiting')}
+        <div
+          {...clickable(() => navigate('/recruiting'))}
           className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-2xl p-6 shadow-sm cursor-pointer hover:border-accent-500/50 hover:shadow-md transition-all"
         >
           <div className="flex items-center justify-between mb-4">
@@ -72,8 +73,8 @@ export default function Dashboard() {
           <p className="text-sm text-amber-600 mt-2">{t('dashboard.needsAttention')}</p>
         </div>
         
-        <div 
-          onClick={() => navigate('/templates')}
+        <div
+          {...clickable(() => navigate('/templates'))}
           className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-2xl p-6 shadow-sm cursor-pointer hover:border-accent-500/50 hover:shadow-md transition-all"
         >
           <div className="flex items-center justify-between mb-4">
@@ -84,8 +85,8 @@ export default function Dashboard() {
           <p className="text-sm text-muted mt-2">{t('dashboard.activeTemplates')}</p>
         </div>
 
-        <div 
-          onClick={() => navigate('/reports')}
+        <div
+          {...clickable(() => navigate('/reports'))}
           className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-2xl p-6 shadow-sm cursor-pointer hover:border-accent-500/50 hover:shadow-md transition-all"
         >
           <div className="flex items-center justify-between mb-4">
@@ -152,7 +153,7 @@ export default function Dashboard() {
                   contentStyle={{ borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--sidebar-bg)', color: 'var(--foreground)' }}
                 />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                  {departmentData.map((entry, index) => (
+                  {departmentData.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Bar>

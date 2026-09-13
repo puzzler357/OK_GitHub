@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, FileText, Search, MoreHorizontal, FileSignature } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDatabaseStore } from '../store/useDatabaseStore';
+import { clickable } from '../lib/a11y';
 
 export default function Templates() {
   const { t } = useTranslation();
@@ -43,7 +44,7 @@ export default function Templates() {
         
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTemplates.map(template => (
-            <div key={template.id} className="border border-[var(--border-color)] rounded-2xl p-5 hover:border-accent-500 transition-colors group bg-white dark:bg-slate-950 flex flex-col cursor-pointer" onClick={() => navigate(`/templates/new?id=${template.id}`)}>
+            <div key={template.id} className="border border-[var(--border-color)] rounded-2xl p-5 hover:border-accent-500 transition-colors group bg-white dark:bg-slate-950 flex flex-col cursor-pointer" {...clickable(() => navigate(`/templates/new?id=${template.id}`), template.name)}>
               <div className="flex justify-between items-start mb-4">
                 <div className="w-10 h-10 rounded-xl bg-accent-50 text-accent-600 dark:bg-accent-900/30 dark:text-accent-400 flex items-center justify-center">
                   <FileText className="w-5 h-5" />

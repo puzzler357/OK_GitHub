@@ -9,6 +9,10 @@
       "DOM",
       "DOM.Iterable"
     ],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "isolatedModules": true,
@@ -26,6 +30,7 @@
   "exclude": [
     "node_modules",
     "dist",
-    "src-tauri"
+    "src-tauri",
+    "eslint.config.js"
   ]
 }

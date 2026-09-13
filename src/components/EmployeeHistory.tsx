@@ -1,9 +1,9 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, ArrowRight } from 'lucide-react';
 import { useMoney } from '../lib/money';
 import { useDatabaseStore } from '../store/useDatabaseStore';
 import type { Employee, Movement } from '../store/useDatabaseStore';
+import { clickable } from '../lib/a11y';
 
 /**
  * Лента кадровых событий по сотруднику.
@@ -44,7 +44,7 @@ export default function EmployeeHistory({ employee, onClose }: { employee: Emplo
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
-      <div className="absolute inset-0 bg-surface backdrop-blur-sm transition-opacity" onClick={onClose} />
+      <div className="absolute inset-0 bg-surface backdrop-blur-sm transition-opacity" {...clickable(onClose, t('common.close'))} />
 
       <div className="relative w-full max-w-md bg-[var(--sidebar-bg)] border-l border-[var(--border-color)] h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
         <div className="flex items-center justify-between p-6 border-b border-[var(--border-color)]">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MoreHorizontal, Edit, Trash, FileText, Printer, X, History } from 'lucide-react';
 import { useDatabaseStore, Employee, Template } from '../store/useDatabaseStore';
@@ -6,6 +6,7 @@ import EmployeeForm from './EmployeeForm';
 import EmployeeHistory from './EmployeeHistory';
 import { renderTemplate } from '../lib/templateVars';
 import { useAppStore } from '../store/useAppStore';
+import { clickable } from '../lib/a11y';
 
 export default function EmployeeActions({ employee }: { employee: Employee }) {
   const { t } = useTranslation();
@@ -46,7 +47,7 @@ export default function EmployeeActions({ employee }: { employee: Employee }) {
 
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)}></div>
+          <div className="fixed inset-0 z-10" {...clickable(() => setIsOpen(false), t('common.close'))} />
           <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 border border-[var(--border-color)] rounded-xl shadow-lg z-20 py-1 overflow-hidden">
             <button 
               className="w-full text-left px-4 py-2 text-sm text-secondary dark:text-slate-300 hover:bg-surface-hover dark:hover:bg-slate-800 flex items-center gap-2"

@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Save, Plus, Type, Table as TableIcon, FileSignature, LayoutTemplate, Printer, Download, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Type, Table as TableIcon, FileSignature, LayoutTemplate, Printer, Trash2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDatabaseStore } from '../store/useDatabaseStore';
 import { useAppStore } from '../store/useAppStore';
+import { clickable } from '../lib/a11y';
 
 export default function TemplateBuilder() {
   const { t } = useTranslation();
@@ -21,24 +22,30 @@ export default function TemplateBuilder() {
   const [blocks, setBlocks] = useState([
     { id: '1', type: 'text', content: `Справка дана {{fullName}} в том, что он(а) действительно работает в ${orgName} в должности {{position}}.` },
   ]);
-  const printRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (templateId) {
-      const template = templates.find(t => t.id === templateId);
-      if (template) {
-        setTemplateName(template.name);
-        setBlocks(template.blocks);
-      }
+  // Подгрузка редактируемого шаблона. Делается при рендере, а не в эффекте:
+  // setState в эффекте стоит лишнего прохода, а здесь React перерисует
+  // компонент сразу с нужным состоянием. loadedId не даёт затереть правки
+  // пользователя при каждом обновлении списка шаблонов.
+  const [loadedId, setLoadedId] = useState<string | null>(null);
+  if (templateId && templateId !== loadedId) {
+    const template = templates.find(item => item.id === templateId);
+    if (template) {
+      setTemplateName(template.name);
+      setBlocks(template.blocks);
+      setLoadedId(templateId);
     }
-  }, [templateId, templates]);
+  }
 
   const removeBlock = (id: string) => {
     setBlocks(blocks.filter(b => b.id !== id));
   };
   
   const addBlock = (type: string) => {
-    setBlocks([...blocks, { id: Math.random().toString(), type, content: '' }]);
+    // Идентификатор выводится из уже существующих: случайное число здесь
+    // ничего не давало, кроме нечистого вызова в теле компонента.
+    const nextId = String(blocks.reduce((max, b) => Math.max(max, Number(b.id) || 0), 0) + 1);
+    setBlocks([...blocks, { id: nextId, type, content: '' }]);
   };
 
   const handlePrint = () => {
@@ -119,7 +126,7 @@ export default function TemplateBuilder() {
               </div>
             ))}
             
-            <div onClick={() => addBlock('text')} className="border-2 border-dashed border-[var(--border-color)] rounded-xl p-8 flex flex-col items-center justify-center text-muted hover:bg-surface-hover dark:hover:bg-slate-900/50 hover:border-accent-300 dark:hover:border-accent-700 transition-colors cursor-pointer">
+            <div {...clickable(() => addBlock('text'), t('builder.addBlock'))} className="border-2 border-dashed border-[var(--border-color)] rounded-xl p-8 flex flex-col items-center justify-center text-muted hover:bg-surface-hover dark:hover:bg-slate-900/50 hover:border-accent-300 dark:hover:border-accent-700 transition-colors cursor-pointer">
               <Plus className="w-6 h-6 mb-2 text-accent-400" />
               <p className="font-medium">{t('builder.addBlock')}</p>
             </div>
@@ -149,7 +156,7 @@ export default function TemplateBuilder() {
             <h3 className="font-semibold mb-4 text-sm text-muted uppercase tracking-wider">{t('templates.variables')}</h3>
             <div className="space-y-1">
               {['{{fullName}}', '{{position}}', '{{department}}', '{{hireDate}}', '{{salary}}'].map(variable => (
-                <div key={variable} onClick={() => { navigator.clipboard.writeText(variable); alert(t('builder.copied', { v: variable })); }} className="px-3 py-2 bg-surface-2 dark:bg-slate-900 rounded-lg text-sm font-mono text-accent-600 dark:text-accent-400 cursor-pointer hover:bg-accent-50 dark:hover:bg-accent-900/30 transition-colors border border-[var(--border-color)]">
+                <div key={variable} {...clickable(() => { navigator.clipboard.writeText(variable); alert(t('builder.copied', { v: variable })); }, variable)} className="px-3 py-2 bg-surface-2 dark:bg-slate-900 rounded-lg text-sm font-mono text-accent-600 dark:text-accent-400 cursor-pointer hover:bg-accent-50 dark:hover:bg-accent-900/30 transition-colors border border-[var(--border-color)]">
                   {variable}
                 </div>
               ))}

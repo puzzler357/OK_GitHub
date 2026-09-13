@@ -22,7 +22,7 @@ import { useAppStore } from '../store/useAppStore';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
-  const { theme, language, setTheme, setLanguage, sidebarOpen, toggleSidebar, user } = useAppStore();
+  const { theme, sidebarOpen, toggleSidebar, user } = useAppStore();
 
   useEffect(() => {
     // Initial theme apply

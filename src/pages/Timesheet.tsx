@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { exportToExcel } from '../lib/excel';
 import { ATTENDANCE_CODES, codeForDay, timesheetTotals } from '../lib/timesheet';

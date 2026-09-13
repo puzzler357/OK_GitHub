@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Target, TrendingUp, Users, Award, X } from 'lucide-react';
 import { useDatabaseStore, TABLES } from '../store/useDatabaseStore';
@@ -22,28 +22,28 @@ export default function Performance() {
   const [newGoal, setNewGoal] = useState({ title: '', progress: 0, status: 'on-track', period: currentPeriod() });
   const [newReview, setNewReview] = useState({ employeeId: '', score: '4', comment: '', period: currentPeriod() });
 
-  useEffect(() => {
-    if (!selectedEmployeeId && employees.length > 0) setSelectedEmployeeId(employees[0].id);
-  }, [employees, selectedEmployeeId]);
+  // Значение выводится из данных, а не досинхронизируется эффектом:
+  // setState внутри эффекта стоит лишнего прохода рендера.
+  const currentEmployeeId = selectedEmployeeId || employees[0]?.id || '';
 
   const employeeName = (id: string) => employees.find(e => e.id === id)?.fullName ?? '—';
 
   const employeeGoals = useMemo(
-    () => goals.filter(g => g.employeeId === selectedEmployeeId),
-    [goals, selectedEmployeeId],
+    () => goals.filter(g => g.employeeId === currentEmployeeId),
+    [goals, currentEmployeeId],
   );
 
   const employeeReviews = useMemo(
-    () => reviews.filter(r => r.employeeId === selectedEmployeeId),
-    [reviews, selectedEmployeeId],
+    () => reviews.filter(r => r.employeeId === currentEmployeeId),
+    [reviews, currentEmployeeId],
   );
 
   const handleAddGoal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newGoal.title || !selectedEmployeeId) return;
+    if (!newGoal.title || !currentEmployeeId) return;
 
     await createIn<Goal>(TABLES.goals, {
-      employeeId: selectedEmployeeId,
+      employeeId: currentEmployeeId,
       title: newGoal.title,
       progress: newGoal.progress,
       status: newGoal.status,
@@ -280,7 +280,7 @@ export default function Performance() {
         </div>
         <div className="flex items-center gap-3">
           <select
-            value={selectedEmployeeId}
+            value={currentEmployeeId}
             onChange={(e) => setSelectedEmployeeId(e.target.value)}
             className="bg-surface border border-line rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 text-primary"
             aria-label={t('performance.employee')}
