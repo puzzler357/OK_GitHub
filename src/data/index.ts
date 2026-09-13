@@ -27,6 +27,18 @@ export const createEmployee = (emp: Omit<Employee, 'id'> & { id?: string }): Pro
     .then((r) => r.json()).then(() => ({ id }));
 };
 
+// Массовая вставка для импорта: обе ветки пишут одной транзакцией, чтобы
+// файл импортировался целиком либо не импортировался вовсе.
+export const createEmployeesBulk = (rows: (Omit<Employee, 'id'> & { id?: string })[]): Promise<{ ids: string[] }> => {
+  if (isTauri) return tauri.createEmployeesBulk(rows);
+  const withIds = rows.map((r) => ({ ...r, id: r.id || rid() }));
+  return fetch('/api/employees/bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ employees: withIds }),
+  }).then(jsonOrThrow);
+};
+
 export const updateEmployee = (id: string, data: Partial<Employee>): Promise<void> => {
   if (isTauri) return tauri.updateEmployeeRow(id, data);
   return fetch(`/api/employees/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(() => undefined);

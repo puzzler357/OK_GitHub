@@ -38,6 +38,7 @@ async function initSchema(db: Database) {
       department TEXT NOT NULL,
       status TEXT NOT NULL,
       hire_date TEXT NOT NULL,
+      tab_number TEXT,
       birth_date TEXT,
       payment_type TEXT DEFAULT 'salary',
       salary REAL DEFAULT 0,
@@ -78,7 +79,18 @@ async function initSchema(db: Database) {
       salary REAL NOT NULL,
       hours_worked REAL NOT NULL
     );
+    -- Служебные флаги; сейчас хранит отметку о первичном посеве.
+    CREATE TABLE IF NOT EXISTS meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
+
+  // База, созданная предыдущей версией схемы, колонки tab_number не имеет.
+  const columns = await db.select<{ name: string }[]>('PRAGMA table_info(employees)');
+  if (!columns.some((c) => c.name === 'tab_number')) {
+    await db.execute('ALTER TABLE employees ADD COLUMN tab_number TEXT');
+  }
 }
 
 async function count(db: Database, table: string): Promise<number> {
@@ -86,9 +98,23 @@ async function count(db: Database, table: string): Promise<number> {
   return rows[0]?.c ?? 0;
 }
 
+const SEED_FLAG = 'seeded';
+
+// Посев выполняется ровно один раз за жизнь базы. Без отметки в meta сброс
+// системы был бы бессмысленным: демо-данные вернулись бы при следующем запуске.
 async function seedIfEmpty(db: Database) {
+  const flag = await db.select<{ value: string }[]>('SELECT value FROM meta WHERE key = ?', [SEED_FLAG]);
+  if (flag.length > 0) return;
+
+  // Непустая база (обновление со старой схемы) — только ставим отметку,
+  // чтобы не задваивать уже существующие записи.
+  if (await count(db, 'users') > 0) {
+    await db.execute('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', [SEED_FLAG, new Date().toISOString()]);
+    return;
+  }
+
   // Однопользовательское приложение: единственная учётная запись владельца.
-  if (await count(db, 'users') === 0) {
+  {
     const hash = bcrypt.hashSync('password123', 10);
     await db.execute(
       'INSERT INTO users (id, email, password_hash, role, name) VALUES (?, ?, ?, ?, ?)',
@@ -96,23 +122,23 @@ async function seedIfEmpty(db: Database) {
     );
   }
 
-  if (await count(db, 'employees') === 0) {
-    const emps: [string, string, string, string, string, string][] = [
-      ['1', 'Иванов Иван Иванович', 'Старший разработчик', 'IT', 'active', '2021-03-15'],
-      ['2', 'Петров Петр Петрович', 'Менеджер по продажам', 'Продажи', 'active', '2022-11-01'],
-      ['3', 'Смирнова Анна Игоревна', 'HR Специалист', 'HR', 'on_leave', '2020-05-20'],
-      ['4', 'Аманмурадов Мердан', 'Аналитик данных', 'Аналитика', 'active', '2023-01-10'],
-      ['5', 'Бердыева Айгуль', 'Junior Дизайнер', 'Дизайн', 'probation', '2024-02-15'],
+  {
+    const emps: [string, string, string, string, string, string, string][] = [
+      ['1', 'Иванов Иван Иванович', 'Старший разработчик', 'IT', 'active', '2021-03-15', '0001'],
+      ['2', 'Петров Петр Петрович', 'Менеджер по продажам', 'Продажи', 'active', '2022-11-01', '0002'],
+      ['3', 'Смирнова Анна Игоревна', 'HR Специалист', 'HR', 'on_leave', '2020-05-20', '0003'],
+      ['4', 'Аманмурадов Мердан', 'Аналитик данных', 'Аналитика', 'active', '2023-01-10', '0004'],
+      ['5', 'Бердыева Айгуль', 'Junior Дизайнер', 'Дизайн', 'probation', '2024-02-15', '0005'],
     ];
     for (const e of emps) {
       await db.execute(
-        'INSERT INTO employees (id, full_name, position, department, status, hire_date) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO employees (id, full_name, position, department, status, hire_date, tab_number) VALUES (?, ?, ?, ?, ?, ?, ?)',
         e,
       );
     }
   }
 
-  if (await count(db, 'departments') === 0) {
+  {
     const deps: [string, string, string | null][] = [
       ['d1', 'ООО "Глобал Тек"', null],
       ['d2', 'IT', 'd1'], ['d3', 'Продажи', 'd1'], ['d4', 'HR', 'd1'],
@@ -123,7 +149,7 @@ async function seedIfEmpty(db: Database) {
     }
   }
 
-  if (await count(db, 'positions') === 0) {
+  {
     const pos: [string, string, string, number, number][] = [
       ['p1', 'd1', 'Генеральный директор', 1, 250000],
       ['p2', 'd1', 'Финансовый директор', 1, 180000],
@@ -140,12 +166,12 @@ async function seedIfEmpty(db: Database) {
     }
   }
 
-  if (await count(db, 'templates') === 0) {
+  {
     const blocks = JSON.stringify([{ id: '1', type: 'text', content: 'Справка дана {{fullName}} в том, что он(а) действительно работает в ООО "Глобал Тек" в должности {{position}}.' }]);
     await db.execute('INSERT INTO templates (id, name, blocks) VALUES (?, ?, ?)', ['1', 'Справка с места работы', blocks]);
   }
 
-  if (await count(db, 'archives') === 0) {
+  {
     const arch: [string, number, number, string, string, string, string, number, number][] = [
       ['a1', 2023, 12, '1', 'Иванов Иван Иванович', 'IT', 'Старший разработчик', 500000, 160],
       ['a2', 2023, 12, '2', 'Петров Петр Петрович', 'Продажи', 'Менеджер по продажам', 300000, 150],
@@ -157,6 +183,8 @@ async function seedIfEmpty(db: Database) {
       await db.execute('INSERT INTO archives (id, year, month, employee_id, employee_name, department, position, salary, hours_worked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', a);
     }
   }
+
+  await db.execute('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', [SEED_FLAG, new Date().toISOString()]);
 }
 
 const rid = () => Math.random().toString(36).substring(7);
@@ -167,24 +195,50 @@ export async function listEmployees(): Promise<Employee[]> {
   const rows = await db.select<any[]>('SELECT * FROM employees');
   return rows.map((e) => ({
     id: e.id, fullName: e.full_name, position: e.position, department: e.department,
-    status: e.status, hireDate: e.hire_date, birthDate: e.birth_date ?? undefined,
+    status: e.status, hireDate: e.hire_date,
+    tabNumber: e.tab_number ?? undefined, birthDate: e.birth_date ?? undefined,
     paymentType: e.payment_type || 'salary', salary: e.salary || 0, rate: e.rate ?? 1,
   }));
 }
+const INSERT_EMPLOYEE =
+  'INSERT INTO employees (id, full_name, position, department, status, hire_date, tab_number, birth_date, payment_type, salary, rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+
+function employeeValues(id: string, e: Omit<Employee, 'id'>) {
+  return [
+    id, e.fullName, e.position, e.department, e.status, e.hireDate,
+    e.tabNumber ?? null, e.birthDate ?? null, e.paymentType ?? 'salary', e.salary ?? 0, e.rate ?? 1,
+  ];
+}
+
 export async function createEmployee(emp: Omit<Employee, 'id'> & { id?: string }): Promise<{ id: string }> {
   const db = await getDb();
   const id = emp.id || rid();
-  await db.execute(
-    'INSERT INTO employees (id, full_name, position, department, status, hire_date, birth_date, payment_type, salary, rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, emp.fullName, emp.position, emp.department, emp.status, emp.hireDate, emp.birthDate ?? null, emp.paymentType ?? 'salary', emp.salary ?? 0, emp.rate ?? 1],
-  );
+  await db.execute(INSERT_EMPLOYEE, employeeValues(id, emp));
   return { id };
+}
+
+// Массовая вставка для импорта из Excel: одной транзакцией, чтобы частично
+// разобранный файл не оставил базу в half-состоянии.
+export async function createEmployeesBulk(rows: (Omit<Employee, 'id'> & { id?: string })[]): Promise<{ ids: string[] }> {
+  const db = await getDb();
+  const ids = rows.map((r) => r.id || rid());
+  await db.execute('BEGIN TRANSACTION');
+  try {
+    for (let i = 0; i < rows.length; i++) {
+      await db.execute(INSERT_EMPLOYEE, employeeValues(ids[i], rows[i]));
+    }
+    await db.execute('COMMIT');
+  } catch (e) {
+    await db.execute('ROLLBACK');
+    throw e;
+  }
+  return { ids };
 }
 export async function updateEmployeeRow(id: string, e: Partial<Employee>): Promise<void> {
   const db = await getDb();
   await db.execute(
-    'UPDATE employees SET full_name = ?, position = ?, department = ?, status = ?, hire_date = ?, birth_date = ?, payment_type = ?, salary = ?, rate = ? WHERE id = ?',
-    [e.fullName, e.position, e.department, e.status, e.hireDate, e.birthDate ?? null, e.paymentType ?? 'salary', e.salary ?? 0, e.rate ?? 1, id],
+    'UPDATE employees SET full_name = ?, position = ?, department = ?, status = ?, hire_date = ?, tab_number = ?, birth_date = ?, payment_type = ?, salary = ?, rate = ? WHERE id = ?',
+    [e.fullName, e.position, e.department, e.status, e.hireDate, e.tabNumber ?? null, e.birthDate ?? null, e.paymentType ?? 'salary', e.salary ?? 0, e.rate ?? 1, id],
   );
 }
 export async function deleteEmployeeRow(id: string): Promise<void> {
@@ -322,6 +376,10 @@ export async function resetSystem(adminPassword: string): Promise<void> {
   if (!admin || !bcrypt.compareSync(adminPassword, admin.password_hash)) {
     throw new Error('Неверный пароль администратора');
   }
-  await db.execute('DELETE FROM employees');
-  await db.execute('DELETE FROM templates');
+  // users намеренно не трогаем: учётная запись владельца должна пережить
+  // сброс, иначе в приложение будет не войти. Список совпадает с серверным
+  // RESETTABLE_TABLES в src/db/sqlite.ts.
+  for (const table of ['employees', 'departments', 'positions', 'templates', 'timesheets', 'archives']) {
+    await db.execute(`DELETE FROM ${table}`);
+  }
 }

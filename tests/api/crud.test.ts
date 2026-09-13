@@ -91,6 +91,91 @@ describe('CRUD сотрудников', () => {
   });
 });
 
+describe('табельный номер', () => {
+  it('сохраняется при создании, читается и меняется при обновлении', async () => {
+    const created = await api('POST', '/api/employees', {
+      fullName: 'Табельный Тест',
+      position: 'Инженер',
+      department: 'IT',
+      status: 'active',
+      hireDate: '2026-02-01',
+      tabNumber: '7788',
+    });
+    const id: string = created.body.id;
+
+    const row = (await api('GET', '/api/employees')).body.find((e: any) => e.id === id);
+    expect(row.tabNumber).toBe('7788');
+
+    await api('PUT', `/api/employees/${id}`, {
+      fullName: 'Табельный Тест',
+      position: 'Инженер',
+      department: 'IT',
+      status: 'active',
+      hireDate: '2026-02-01',
+      tabNumber: '9900',
+    });
+    expect((await api('GET', '/api/employees')).body.find((e: any) => e.id === id).tabNumber).toBe('9900');
+
+    await api('DELETE', `/api/employees/${id}`);
+  });
+
+  it('у сотрудников без номера поле не выдумывается', async () => {
+    const created = await api('POST', '/api/employees', {
+      fullName: 'Без Номера',
+      position: 'Стажёр',
+      department: 'IT',
+      status: 'probation',
+      hireDate: '2026-02-01',
+    });
+    const id: string = created.body.id;
+
+    const row = (await api('GET', '/api/employees')).body.find((e: any) => e.id === id);
+    expect(row.tabNumber).toBeUndefined();
+
+    await api('DELETE', `/api/employees/${id}`);
+  });
+});
+
+describe('массовый импорт сотрудников', () => {
+  it('POST /api/employees/bulk пишет все строки в базу', async () => {
+    const before = (await api('GET', '/api/employees')).body.length;
+
+    const rows = [
+      { fullName: 'Импорт Первый', position: 'Инженер', department: 'IT', status: 'active', hireDate: '2026-01-01', tabNumber: '1001' },
+      { fullName: 'Импорт Второй', position: 'Аналитик', department: 'Аналитика', status: 'active', hireDate: '2026-01-02' },
+      { fullName: 'Импорт Третий', position: 'Дизайнер', department: 'Дизайн', status: 'probation', hireDate: '2026-01-03' },
+    ];
+
+    const { status, body } = await api('POST', '/api/employees/bulk', { employees: rows });
+    expect(status).toBe(200);
+    expect(body.ids).toHaveLength(3);
+
+    // Главное, ради чего задача и заводилась: строки должны пережить
+    // перечитывание списка, а не жить только в сторе на клиенте.
+    const after = (await api('GET', '/api/employees')).body;
+    expect(after.length).toBe(before + 3);
+
+    const first = after.find((e: any) => e.id === body.ids[0]);
+    expect(first).toMatchObject({ fullName: 'Импорт Первый', department: 'IT', tabNumber: '1001' });
+
+    for (const id of body.ids) {
+      await api('DELETE', `/api/employees/${id}`);
+    }
+    expect((await api('GET', '/api/employees')).body.length).toBe(before);
+  });
+
+  it('отклоняет тело без массива employees', async () => {
+    const { status } = await api('POST', '/api/employees/bulk', { rows: [] });
+    expect(status).toBe(400);
+  });
+
+  it('пустой массив не ломает запрос', async () => {
+    const { status, body } = await api('POST', '/api/employees/bulk', { employees: [] });
+    expect(status).toBe(200);
+    expect(body.ids).toEqual([]);
+  });
+});
+
 describe('CRUD оргструктуры', () => {
   it('подразделение: создание с родителем, переименование, удаление', async () => {
     const { body } = await api('POST', '/api/departments', { name: 'Тестовый отдел', parentId: 'd1' });

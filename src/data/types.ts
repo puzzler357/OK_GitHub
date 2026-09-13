@@ -22,6 +22,8 @@ export interface Employee {
   department: string;
   status: 'active' | 'on_leave' | 'probation';
   hireDate: string;
+  /** Табельный номер — кадровый реквизит, задаётся вручную или приходит из импорта. */
+  tabNumber?: string;
   birthDate?: string;
   paymentType?: 'salary' | 'hourly' | 'piecework';
   salary?: number;

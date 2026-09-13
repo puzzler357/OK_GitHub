@@ -14,6 +14,8 @@ interface DatabaseState {
   updateEmployee: (id: string, emp: Partial<Employee>) => void;
   deleteEmployee: (id: string) => void;
   setEmployees: (emps: Employee[]) => void;
+  /** Массовый импорт: пишет строки в БД одной транзакцией и добавляет их в стор. */
+  importEmployees: (rows: Omit<Employee, 'id'>[]) => Promise<number>;
 
   timesheets: TimesheetRecord[];
   addTimesheet: (record: Omit<TimesheetRecord, 'id'>) => void;
@@ -77,6 +79,15 @@ export const useDatabaseStore = create<DatabaseState & { fetchAll: () => Promise
       },
       setEmployees: (emps) => {
         set({ employees: emps });
+      },
+      importEmployees: async (rows) => {
+        if (rows.length === 0) return 0;
+        // Сначала БД, потом стор: раньше импорт менял только стейт, и данные
+        // исчезали при первом же fetchAll().
+        const { ids } = await api.createEmployeesBulk(rows);
+        const created = rows.map((row, i) => ({ ...row, id: ids[i] }));
+        set((state) => ({ employees: [...state.employees, ...created] }));
+        return created.length;
       },
 
       addDepartment: async (dep) => {

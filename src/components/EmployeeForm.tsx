@@ -13,6 +13,7 @@ const employeeSchema = z.object({
   department: z.string().min(2),
   status: z.enum(['active', 'on_leave', 'probation']),
   hireDate: z.string().min(1),
+  tabNumber: z.string().optional(),
   birthDate: z.string().optional(),
   paymentType: z.enum(['salary', 'hourly', 'piecework']).optional().default('salary'),
   salary: z.coerce.number().min(0).optional().default(0),
@@ -36,6 +37,7 @@ export default function EmployeeForm({ initialData, onClose, onSubmit }: Employe
     department: z.string().min(2, t('employees.form.validation.departmentReq')),
     status: z.enum(['active', 'on_leave', 'probation']),
     hireDate: z.string().min(1, t('employees.form.validation.hireDateReq')),
+    tabNumber: z.string().optional(),
     birthDate: z.string().optional(),
     paymentType: z.enum(['salary', 'hourly', 'piecework']).optional().default('salary'),
     salary: z.coerce.number().min(0).optional().default(0),
@@ -101,6 +103,14 @@ export default function EmployeeForm({ initialData, onClose, onSubmit }: Employe
               placeholder={t('employees.form.ph.department')}
             />
             {errors.department && <p className="text-rose-500 text-xs mt-1">{errors.department.message}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">{t('employees.col.tabNumber')}</label>
+            <input
+              {...register('tabNumber')}
+              className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

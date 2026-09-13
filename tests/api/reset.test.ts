@@ -1,0 +1,62 @@
+import { beforeAll, afterAll, describe, expect, it } from 'vitest';
+import { api, startApi, stopApi } from './helpers';
+
+// ВАЖНО: этот файл чистит базу и не восстанавливает её — посев выполняется
+// один раз за жизнь файла БД, вернуть демо-данные после сброса нельзя.
+// Файлы тестов идут последовательно (fileParallelism: false) в порядке имён,
+// поэтому reset.test.ts должен оставаться последним по алфавиту среди
+// tests/api/*.test.ts. Новый файл, сортирующийся после него, получит пустую базу.
+
+const EMAIL = 'admin@global.tech';
+const PASSWORD = 'password123';
+
+beforeAll(async () => {
+  await startApi();
+});
+afterAll(stopApi);
+
+describe('POST /api/auth/reset-system', () => {
+  it('не чистит базу при неверном пароле администратора', async () => {
+    const before = (await api('GET', '/api/employees')).body.length;
+
+    const { status } = await api('POST', '/api/auth/reset-system', { adminPassword: 'not-my-password' });
+    expect(status).toBe(401);
+
+    expect((await api('GET', '/api/employees')).body.length).toBe(before);
+  });
+
+  it('очищает все таблицы данных, а не только сотрудников и шаблоны', async () => {
+    // Кладём по записи в каждую таблицу, чтобы проверять именно полноту сброса.
+    await api('POST', '/api/employees', {
+      fullName: 'Сброс Тест', position: 'Инженер', department: 'IT', status: 'active', hireDate: '2026-01-01',
+    });
+    await api('POST', '/api/departments', { name: 'Отдел перед сбросом', parentId: null });
+    await api('POST', '/api/positions', { departmentId: 'd2', title: 'Должность перед сбросом', maxCount: 1, salary: 1000 });
+    await api('POST', '/api/templates', { name: 'Шаблон перед сбросом', blocks: [] });
+    await api('POST', '/api/timesheets', { year: 2026, month: 1, employeeId: '1', days: { 1: 8 } });
+    await api('POST', '/api/archives', {
+      year: 2026, month: 1, employeeId: '1', employeeName: 'Сброс Тест',
+      department: 'IT', position: 'Инженер', salary: 1000, hoursWorked: 160,
+    });
+
+    const routes = ['/api/employees', '/api/departments', '/api/positions', '/api/templates', '/api/timesheets', '/api/archives'];
+    for (const route of routes) {
+      expect((await api('GET', route)).body.length).toBeGreaterThan(0);
+    }
+
+    const { status } = await api('POST', '/api/auth/reset-system', { adminPassword: PASSWORD });
+    expect(status).toBe(200);
+
+    for (const route of routes) {
+      expect((await api('GET', route)).body).toEqual([]);
+    }
+  });
+
+  it('учётная запись владельца переживает сброс', async () => {
+    // Иначе после сброса в приложение было бы не войти.
+    const { status, body } = await api('POST', '/api/auth/login', { email: EMAIL, password: PASSWORD });
+
+    expect(status).toBe(200);
+    expect(body.user).toMatchObject({ email: EMAIL, role: 'ADMIN' });
+  });
+});

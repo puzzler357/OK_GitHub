@@ -5,7 +5,7 @@ import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { createServer as createViteServer } from 'vite';
-import db from './src/db/sqlite';
+import db, { RESETTABLE_TABLES } from './src/db/sqlite';
 
 export const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -49,11 +49,14 @@ app.post('/api/auth/reset-system', (req, res) => {
     return res.status(401).json({ error: 'Неверный пароль администратора' });
   }
   
-  // Wipe logic (for local system reset)
-  db.exec(`
-    DELETE FROM employees;
-    DELETE FROM templates;
-  `);
+  // Чистим все таблицы данных одной транзакцией; учётная запись владельца
+  // в список не входит и переживает сброс.
+  db.transaction(() => {
+    for (const table of RESETTABLE_TABLES) {
+      db.prepare(`DELETE FROM ${table}`).run();
+    }
+  })();
+
   
   res.json({ success: true, message: 'Все данные системы были успешно сброшены' });
 });
@@ -67,6 +70,7 @@ app.get('/api/employees', (req, res) => {
     department: e.department,
     status: e.status,
     hireDate: e.hire_date,
+    tabNumber: e.tab_number ?? undefined,
     birthDate: e.birth_date,
     paymentType: e.payment_type || 'salary',
     salary: e.salary || 0,
@@ -75,18 +79,41 @@ app.get('/api/employees', (req, res) => {
   res.json(employees);
 });
 
+const insertEmployee = () => db.prepare(
+  'INSERT INTO employees (id, full_name, position, department, status, hire_date, tab_number, birth_date, payment_type, salary, rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+);
+
+const newEmployeeId = () => Math.random().toString(36).substring(7);
+
 app.post('/api/employees', (req, res) => {
-  const { id, fullName, position, department, status, hireDate, birthDate, paymentType = 'salary', salary = 0, rate = 1 } = req.body;
-  const newId = id || Math.random().toString(36).substring(7);
-  db.prepare('INSERT INTO employees (id, full_name, position, department, status, hire_date, birth_date, payment_type, salary, rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(newId, fullName, position, department, status, hireDate, birthDate, paymentType, salary, rate);
+  const { id, fullName, position, department, status, hireDate, tabNumber, birthDate, paymentType = 'salary', salary = 0, rate = 1 } = req.body;
+  const newId = id || newEmployeeId();
+  insertEmployee().run(newId, fullName, position, department, status, hireDate, tabNumber ?? null, birthDate, paymentType, salary, rate);
   res.json({ id: newId });
 });
 
+// Массовая вставка для импорта из Excel: одна транзакция на весь файл.
+app.post('/api/employees/bulk', (req, res) => {
+  const rows = Array.isArray(req.body?.employees) ? req.body.employees : null;
+  if (!rows) return res.status(400).json({ error: 'Ожидался массив employees' });
+
+  const stmt = insertEmployee();
+  const ids: string[] = [];
+  db.transaction(() => {
+    for (const e of rows) {
+      const newId = e.id || newEmployeeId();
+      stmt.run(newId, e.fullName, e.position, e.department, e.status, e.hireDate, e.tabNumber ?? null, e.birthDate ?? null, e.paymentType ?? 'salary', e.salary ?? 0, e.rate ?? 1);
+      ids.push(newId);
+    }
+  })();
+
+  res.json({ ids });
+});
+
 app.put('/api/employees/:id', (req, res) => {
-  const { fullName, position, department, status, hireDate, birthDate, paymentType, salary, rate } = req.body;
-  db.prepare('UPDATE employees SET full_name = ?, position = ?, department = ?, status = ?, hire_date = ?, birth_date = ?, payment_type = ?, salary = ?, rate = ? WHERE id = ?')
-    .run(fullName, position, department, status, hireDate, birthDate, paymentType, salary, rate, req.params.id);
+  const { fullName, position, department, status, hireDate, tabNumber, birthDate, paymentType, salary, rate } = req.body;
+  db.prepare('UPDATE employees SET full_name = ?, position = ?, department = ?, status = ?, hire_date = ?, tab_number = ?, birth_date = ?, payment_type = ?, salary = ?, rate = ? WHERE id = ?')
+    .run(fullName, position, department, status, hireDate, tabNumber ?? null, birthDate, paymentType, salary, rate, req.params.id);
   res.json({ success: true });
 });
 
