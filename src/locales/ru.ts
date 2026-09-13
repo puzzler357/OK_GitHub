@@ -81,6 +81,7 @@ export const ru = {
         status: "Статус"
       },
       status: {
+        dismissed: "Уволен",
         active: "Активен",
         onLeave: "В отпуске",
         probation: "Испыт. срок"
@@ -292,6 +293,21 @@ export const ru = {
       copied: "Скопировано в буфер обмена: {{v}}"
     },
     movements: {
+      employee: "Сотрудник",
+      date: "Дата операции",
+      orderNo: "Номер приказа",
+      newPosition: "Новая должность",
+      newDepartment: "Новое подразделение",
+      newSalary: "Новый оклад",
+      was: "Было",
+      became: "Стало",
+      type: "Тип операции",
+      dateFrom: "С даты",
+      dateTo: "По дату",
+      noRecords: "Кадровых операций пока нет",
+      apply: "Провести",
+      history: "История",
+      noHistory: "Изменений по сотруднику пока нет",
       hire: "Приём",
       transfer: "Перевод",
       dismissal: "Увольнение",
@@ -301,6 +317,12 @@ export const ru = {
       datePh: "дд.мм.гггг"
     },
     calendar: {
+      birthday: "День рождения",
+      anniversary: "Годовщина приёма",
+      timeOff: "Отсутствие",
+      noEvents: "Событий нет",
+      today: "Сегодня",
+      inDays: "через {{n}} дн.",
       weekdays: ["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"],
       upcoming: "Предстоящие события"
     },

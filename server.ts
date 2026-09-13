@@ -6,7 +6,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { createServer as createViteServer } from 'vite';
 import db, { RESETTABLE_TABLES } from './src/db/sqlite';
-import { ENTITIES, insertSql, selectSql, updateSql, rowToObject, objectToValues } from './src/data/entities';
+import { ENTITIES, ENTITY_BY_TABLE, insertSql, selectSql, updateSql, rowToObject, objectToValues } from './src/data/entities';
+import { employeePatchFor, employeeUpdate } from './src/data/movements';
 
 export const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -89,6 +90,42 @@ for (const entity of ENTITIES) {
     res.json({ success: true });
   });
 }
+
+// Проведение кадровой операции. Запись в movements и изменение карточки
+// сотрудника идут одной транзакцией: запись о переводе без самого перевода
+// (и наоборот) — рассогласование, которое потом не разобрать.
+app.post('/api/movements/apply', (req, res) => {
+  const movement = req.body;
+  if (!movement?.employeeId || !movement?.type || !movement?.date) {
+    return res.status(400).json({ error: 'Нужны employeeId, type и date' });
+  }
+
+  const employee = db.prepare('SELECT * FROM employees WHERE id = ?').get(movement.employeeId) as any;
+  if (!employee) return res.status(404).json({ error: 'Сотрудник не найден' });
+
+  // Прежние значения фиксируются на сервере, а не приходят от клиента:
+  // иначе в истории осело бы то, что было открыто в форме, а не в базе.
+  const record = {
+    ...movement,
+    fromPosition: employee.position,
+    fromDepartment: employee.department,
+    fromSalary: employee.salary ?? 0,
+  };
+
+  const entity = ENTITY_BY_TABLE.get('movements')!;
+  const id = movement.id || Math.random().toString(36).substring(7);
+  const patch = employeePatchFor(record);
+  const update = employeeUpdate(patch);
+
+  db.transaction(() => {
+    db.prepare(insertSql(entity)).run(id, ...objectToValues(entity, record));
+    if (update) {
+      db.prepare(`UPDATE employees SET ${update.assignments} WHERE id = ?`).run(...update.values, movement.employeeId);
+    }
+  })();
+
+  res.json({ id, movement: { ...record, id }, employeePatch: patch });
+});
 
 // API Employees
 app.get('/api/employees', (req, res) => {

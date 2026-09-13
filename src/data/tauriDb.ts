@@ -10,6 +10,7 @@ import {
   ENTITIES, ENTITY_BY_TABLE, allSchemaSql, insertSql, selectSql, updateSql, rowToObject, objectToValues,
 } from './entities';
 import { seedValues } from './seedData';
+import { employeePatchFor, employeeUpdate } from './movements';
 
 const DB_URL = 'sqlite:local-hr-docs.db';
 
@@ -430,6 +431,41 @@ export async function deleteEntity(table: string, id: string): Promise<void> {
   if (!entity) throw new Error(`Неизвестная таблица: ${table}`);
   const db = await getDb();
   await db.execute(`DELETE FROM ${entity.table} WHERE id = ?`, [id]);
+}
+
+// ---- Кадровые операции ----
+// Запись и изменение карточки — одной транзакцией, как и на сервере.
+export async function applyMovement(movement: any): Promise<{ id: string; movement: any; employeePatch: any }> {
+  const db = await getDb();
+  const rows = await db.select<any[]>('SELECT * FROM employees WHERE id = ?', [movement.employeeId]);
+  const employee = rows[0];
+  if (!employee) throw new Error('Сотрудник не найден');
+
+  const record = {
+    ...movement,
+    fromPosition: employee.position,
+    fromDepartment: employee.department,
+    fromSalary: employee.salary ?? 0,
+  };
+
+  const entity = ENTITY_BY_TABLE.get('movements')!;
+  const id = movement.id || rid();
+  const patch = employeePatchFor(record);
+  const update = employeeUpdate(patch);
+
+  await db.execute('BEGIN TRANSACTION');
+  try {
+    await db.execute(insertSql(entity), [id, ...objectToValues(entity, record)]);
+    if (update) {
+      await db.execute(`UPDATE employees SET ${update.assignments} WHERE id = ?`, [...update.values, movement.employeeId]);
+    }
+    await db.execute('COMMIT');
+  } catch (e) {
+    await db.execute('ROLLBACK');
+    throw e;
+  }
+
+  return { id, movement: { ...record, id }, employeePatch: patch };
 }
 
 // ---- Auth (локальная, без JWT) ----

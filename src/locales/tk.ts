@@ -81,6 +81,7 @@ export const tk = {
         status: "Ýagdaýy"
       },
       status: {
+        dismissed: "Işden çykaryldy",
         active: "Işjeň",
         onLeave: "Rugsatda",
         probation: "Synag möhleti"
@@ -292,6 +293,21 @@ export const tk = {
       copied: "Alyş-çalyş buferine göçürildi: {{v}}"
     },
     movements: {
+      employee: "Işgär",
+      date: "Amalyň senesi",
+      orderNo: "Buýrugyň belgisi",
+      newPosition: "Täze wezipe",
+      newDepartment: "Täze bölüm",
+      newSalary: "Täze aýlyk",
+      was: "Öňki",
+      became: "Soňky",
+      type: "Amalyň görnüşi",
+      dateFrom: "Senesinden",
+      dateTo: "Senesine çenli",
+      noRecords: "Kadr amallary entek ýok",
+      apply: "Geçirmek",
+      history: "Taryh",
+      noHistory: "Işgär boýunça üýtgeşme entek ýok",
       hire: "Işe kabul",
       transfer: "Geçiriş",
       dismissal: "Işden çykarmak",
@@ -301,6 +317,12 @@ export const tk = {
       datePh: "gg.aa.ýýýý"
     },
     calendar: {
+      birthday: "Doglan güni",
+      anniversary: "Işe kabul ediliş ýyllygy",
+      timeOff: "Işde ýok",
+      noEvents: "Wakalar ýok",
+      today: "Şu gün",
+      inDays: "{{n}} günden",
       weekdays: ["Duş", "Siş", "Çar", "Pen", "Ann", "Şen", "Ýek"],
       upcoming: "Öňümizdäki wakalar"
     },

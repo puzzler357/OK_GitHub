@@ -173,6 +173,11 @@ export const deleteEntity = (table: string, id: string): Promise<void> =>
   isTauri ? tauri.deleteEntity(table, id)
     : fetch(`${routeOf(table)}/${id}`, { method: 'DELETE' }).then(jsonOrThrow).then(() => undefined);
 
+/** Проведение кадровой операции: запись в movements + изменение карточки. */
+export const applyMovement = (movement: any): Promise<{ id: string; movement: any; employeePatch: any }> =>
+  isTauri ? tauri.applyMovement(movement)
+    : fetch('/api/movements/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(movement) }).then(jsonOrThrow);
+
 // ---- Auth ----
 export const login = (email: string, password: string): Promise<LoginResult> =>
   isTauri ? tauri.login(email, password)

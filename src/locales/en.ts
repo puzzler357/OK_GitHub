@@ -81,6 +81,7 @@ export const en = {
         status: "Status"
       },
       status: {
+        dismissed: "Dismissed",
         active: "Active",
         onLeave: "On leave",
         probation: "Probation"
@@ -292,6 +293,21 @@ export const en = {
       copied: "Copied to clipboard: {{v}}"
     },
     movements: {
+      employee: "Employee",
+      date: "Operation date",
+      orderNo: "Order number",
+      newPosition: "New position",
+      newDepartment: "New department",
+      newSalary: "New salary",
+      was: "Before",
+      became: "After",
+      type: "Operation type",
+      dateFrom: "From date",
+      dateTo: "To date",
+      noRecords: "No personnel operations yet",
+      apply: "Apply",
+      history: "History",
+      noHistory: "No changes for this employee yet",
       hire: "Hiring",
       transfer: "Transfer",
       dismissal: "Dismissal",
@@ -301,6 +317,12 @@ export const en = {
       datePh: "dd.mm.yyyy"
     },
     calendar: {
+      birthday: "Birthday",
+      anniversary: "Work anniversary",
+      timeOff: "Absence",
+      noEvents: "No events",
+      today: "Today",
+      inDays: "in {{n}} d.",
       weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
       upcoming: "Upcoming events"
     },

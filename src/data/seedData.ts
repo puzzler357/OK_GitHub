@@ -46,6 +46,17 @@ export const SEED_ROWS: Record<string, Record<string, unknown>[]> = {
     { id: 'r2', employeeId: '2', reviewer: 'Иванов Иван', period: '2026-Q2', score: 4, comment: 'План выполнен, есть куда расти в работе с возражениями.' },
   ],
 
+  // По одной записи о приёме на каждого посеянного сотрудника. Это не выдумка:
+  // операции соответствуют hire_date из посева employees, поэтому лента истории
+  // сразу согласуется с карточками.
+  movements: [
+    { id: 'm1', employeeId: '1', type: 'hire', date: '2021-03-15', fromPosition: null, toPosition: 'Старший разработчик', fromDepartment: null, toDepartment: 'IT', fromSalary: 0, toSalary: 0, orderNo: 'П-1', reason: null },
+    { id: 'm2', employeeId: '2', type: 'hire', date: '2022-11-01', fromPosition: null, toPosition: 'Менеджер по продажам', fromDepartment: null, toDepartment: 'Продажи', fromSalary: 0, toSalary: 0, orderNo: 'П-2', reason: null },
+    { id: 'm3', employeeId: '3', type: 'hire', date: '2020-05-20', fromPosition: null, toPosition: 'HR Специалист', fromDepartment: null, toDepartment: 'HR', fromSalary: 0, toSalary: 0, orderNo: 'П-3', reason: null },
+    { id: 'm4', employeeId: '4', type: 'hire', date: '2023-01-10', fromPosition: null, toPosition: 'Аналитик данных', fromDepartment: null, toDepartment: 'Аналитика', fromSalary: 0, toSalary: 0, orderNo: 'П-4', reason: null },
+    { id: 'm5', employeeId: '5', type: 'hire', date: '2024-02-15', fromPosition: null, toPosition: 'Junior Дизайнер', fromDepartment: null, toDepartment: 'Дизайн', fromSalary: 0, toSalary: 0, orderNo: 'П-5', reason: null },
+  ],
+
   kb_categories: [
     { id: 'kc1', name: 'Кадровые процедуры', orderIndex: 1 },
     { id: 'kc2', name: 'Документы и справки', orderIndex: 2 },

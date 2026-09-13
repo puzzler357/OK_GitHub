@@ -20,7 +20,7 @@ export interface Employee {
   fullName: string;
   position: string;
   department: string;
-  status: 'active' | 'on_leave' | 'probation';
+  status: 'active' | 'on_leave' | 'probation' | 'dismissed';
   hireDate: string;
   /** Табельный номер — кадровый реквизит, задаётся вручную или приходит из импорта. */
   tabNumber?: string;
@@ -120,6 +120,28 @@ export interface Review {
   period: string;
   score: number;
   comment?: string;
+}
+
+export type MovementType = 'hire' | 'transfer' | 'dismissal';
+
+/**
+ * Кадровая операция. Пишется вместе с изменением карточки сотрудника одной
+ * транзакцией: запись о переводе без самого перевода (и наоборот) —
+ * рассогласование, которое потом никак не разобрать.
+ */
+export interface Movement {
+  id: string;
+  employeeId: string;
+  type: MovementType;
+  date: string;
+  fromPosition?: string;
+  toPosition?: string;
+  fromDepartment?: string;
+  toDepartment?: string;
+  fromSalary: number;
+  toSalary: number;
+  orderNo?: string;
+  reason?: string;
 }
 
 export interface KbCategory {

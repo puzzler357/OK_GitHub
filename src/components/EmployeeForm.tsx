@@ -11,7 +11,7 @@ const employeeSchema = z.object({
   fullName: z.string().min(2),
   position: z.string().min(2),
   department: z.string().min(2),
-  status: z.enum(['active', 'on_leave', 'probation']),
+  status: z.enum(['active', 'on_leave', 'probation', 'dismissed']),
   hireDate: z.string().min(1),
   tabNumber: z.string().optional(),
   birthDate: z.string().optional(),
@@ -35,7 +35,7 @@ export default function EmployeeForm({ initialData, onClose, onSubmit }: Employe
     fullName: z.string().min(2, t('employees.form.validation.nameMin')),
     position: z.string().min(2, t('employees.form.validation.positionReq')),
     department: z.string().min(2, t('employees.form.validation.departmentReq')),
-    status: z.enum(['active', 'on_leave', 'probation']),
+    status: z.enum(['active', 'on_leave', 'probation', 'dismissed']),
     hireDate: z.string().min(1, t('employees.form.validation.hireDateReq')),
     tabNumber: z.string().optional(),
     birthDate: z.string().optional(),
@@ -123,6 +123,7 @@ export default function EmployeeForm({ initialData, onClose, onSubmit }: Employe
                 <option value="active">{t('employees.status.active')}</option>
                 <option value="probation">{t('employees.status.probation')}</option>
                 <option value="on_leave">{t('employees.status.onLeave')}</option>
+                <option value="dismissed">{t('employees.status.dismissed')}</option>
               </select>
             </div>
             

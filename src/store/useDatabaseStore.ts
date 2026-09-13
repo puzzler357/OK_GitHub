@@ -3,13 +3,13 @@ import * as api from '../data';
 import { ENTITIES, ENTITY_BY_TABLE } from '../data/entities';
 import type {
   Employee, Department, Position, TimesheetRecord, ArchiveRecord, ArchiveFilters, Template,
-  Candidate, TimeOffRequest, ChecklistTask, Goal, Review, KbCategory, KbArticle,
+  Candidate, TimeOffRequest, ChecklistTask, Goal, Review, KbCategory, KbArticle, Movement,
 } from '../data/types';
 
 // Ре-экспорт типов: страницы импортируют их из этого модуля.
 export type {
   Employee, Department, Position, TimesheetRecord, ArchiveRecord, ArchiveFilters, Template,
-  Candidate, TimeOffRequest, ChecklistTask, Goal, Review, KbCategory, KbArticle,
+  Candidate, TimeOffRequest, ChecklistTask, Goal, Review, KbCategory, KbArticle, Movement, MovementType,
 } from '../data/types';
 export { TABLES } from '../data/entities';
 
@@ -60,6 +60,7 @@ interface DatabaseState {
   reviews: Review[];
   kbCategories: KbCategory[];
   kbArticles: KbArticle[];
+  movements: Movement[];
 
   addPosition: (pos: Omit<Position, 'id'>) => Promise<void>;
   updatePosition: (id: string, data: Partial<Position>) => Promise<void>;
@@ -78,6 +79,8 @@ interface DatabaseState {
 // Настройки интерфейса persist сохраняет — но это useAppStore, десяток
 // скалярных полей, а не таблицы.
 interface EntityActions {
+  /** Проведение кадровой операции: запись в movements + изменение карточки. */
+  applyMovement: (movement: Omit<Movement, 'id' | 'fromPosition' | 'fromDepartment' | 'fromSalary'>) => Promise<void>;
   /** Универсальные операции над таблицами из entities.ts. */
   createIn: <T extends { id: string }>(table: string, data: Omit<T, 'id'> & { id?: string }) => Promise<string>;
   updateIn: (table: string, id: string, patch: Record<string, unknown>) => Promise<void>;
@@ -108,6 +111,7 @@ export const useDatabaseStore = create<DatabaseState & FetchActions & EntityActi
     reviews: [],
     kbCategories: [],
     kbArticles: [],
+    movements: [],
 
     // Справочники грузятся целиком — их размер ограничен штатом и структурой.
     // Табель и архив сюда не входят: они растут линейно по времени, и их
@@ -161,6 +165,14 @@ export const useDatabaseStore = create<DatabaseState & FetchActions & EntityActi
         [entity.stateKey]: (state as any)[entity.stateKey].filter((row: any) => row.id !== id),
       }) as any);
       await api.deleteEntity(table, id);
+    },
+
+    applyMovement: async (movement) => {
+      const { movement: saved, employeePatch } = await api.applyMovement(movement);
+      set((state) => ({
+        movements: [saved, ...state.movements],
+        employees: state.employees.map((e) => (e.id === movement.employeeId ? { ...e, ...employeePatch } : e)),
+      }));
     },
 
     fetchTimesheets: async (year, month) => {

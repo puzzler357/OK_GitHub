@@ -122,6 +122,26 @@ export const ENTITIES: EntityDef[] = [
     ],
   },
   {
+    table: 'movements',
+    stateKey: 'movements',
+    route: 'movements',
+    orderBy: 'date DESC',
+    columns: [
+      text('employeeId', 'employee_id'),
+      // hire | transfer | dismissal
+      text('type', 'type'),
+      text('date', 'date'),
+      text('fromPosition', 'from_position', false),
+      text('toPosition', 'to_position', false),
+      text('fromDepartment', 'from_department', false),
+      text('toDepartment', 'to_department', false),
+      num('fromSalary', 'from_salary'),
+      num('toSalary', 'to_salary'),
+      text('orderNo', 'order_no', false),
+      text('reason', 'reason', false),
+    ],
+  },
+  {
     table: 'kb_categories',
     stateKey: 'kbCategories',
     route: 'kb-categories',
@@ -156,6 +176,7 @@ export const TABLES = {
   checklistTasks: 'checklist_tasks',
   goals: 'goals',
   reviews: 'reviews',
+  movements: 'movements',
   kbCategories: 'kb_categories',
   kbArticles: 'kb_articles',
 } as const;
@@ -169,7 +190,7 @@ export function createTableSql(entity: EntityDef): string {
 /** Индексы под связи, по которым экраны фильтруют. */
 export function createIndexSql(entity: EntityDef): string[] {
   return entity.columns
-    .filter((c) => c.column === 'employee_id' || c.column === 'category_id' || c.column === 'status')
+    .filter((c) => ['employee_id', 'category_id', 'status', 'date'].includes(c.column))
     .map((c) => `CREATE INDEX IF NOT EXISTS idx_${entity.table}_${c.column} ON ${entity.table}(${c.column});`);
 }
 

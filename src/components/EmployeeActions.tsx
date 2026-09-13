@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MoreHorizontal, Edit, Trash, FileText, Printer, X } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash, FileText, Printer, X, History } from 'lucide-react';
 import { useDatabaseStore, Employee, Template } from '../store/useDatabaseStore';
 import EmployeeForm from './EmployeeForm';
+import EmployeeHistory from './EmployeeHistory';
 
 export default function EmployeeActions({ employee }: { employee: Employee }) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const { deleteEmployee, updateEmployee, templates } = useDatabaseStore();
 
@@ -58,6 +60,13 @@ export default function EmployeeActions({ employee }: { employee: Employee }) {
               <FileText className="w-4 h-4" />
               {t('employees.actions.genDoc')}
             </button>
+            <button
+              className="w-full text-left px-4 py-2 text-sm text-secondary dark:text-slate-300 hover:bg-surface-hover dark:hover:bg-slate-800 flex items-center gap-2"
+              onClick={() => { setIsHistoryOpen(true); setIsOpen(false); }}
+            >
+              <History className="w-4 h-4" />
+              {t('movements.history')}
+            </button>
             <div className="border-t border-[var(--border-color)] my-1"></div>
             <button
               className="w-full text-left px-4 py-2 text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 flex items-center gap-2"
@@ -76,6 +85,10 @@ export default function EmployeeActions({ employee }: { employee: Employee }) {
           templates={templates} 
           onClose={() => setIsDocModalOpen(false)} 
         />
+      )}
+
+      {isHistoryOpen && (
+        <EmployeeHistory employee={employee} onClose={() => setIsHistoryOpen(false)} />
       )}
 
       {isEditOpen && (
