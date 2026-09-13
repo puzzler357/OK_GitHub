@@ -7,7 +7,7 @@ import type {
   Employee, Department, Position, TimesheetRecord, ArchiveRecord, ArchiveFilters, Template, LoginResult,
 } from './types';
 import {
-  ENTITIES, ENTITY_BY_TABLE, allSchemaSql, insertSql, selectSql, updateSql, rowToObject, objectToValues,
+  ENTITIES, ENTITY_BY_TABLE, AUDIT_TABLE, allSchemaSql, insertSql, selectSql, updateSql, rowToObject, objectToValues,
 } from './entities';
 import { seedValues } from './seedData';
 import { employeePatchFor, employeeUpdate } from './movements';
@@ -213,6 +213,15 @@ async function seedIfEmpty(db: Database) {
 
 const rid = () => Math.random().toString(36).substring(7);
 
+// Журнал аудита пишется слоем данных, как и на сервере: событие должно
+// попадать в журнал вместе с самим изменением, а не когда экран вспомнит.
+async function audit(db: Database, action: string, entity: string, entityId?: string | null, diff?: string | null) {
+  await db.execute(
+    'INSERT INTO audit_log (id, ts, action, entity, entity_id, diff) VALUES (?, ?, ?, ?, ?, ?)',
+    [rid(), new Date().toISOString(), action, entity, entityId ?? null, diff ?? null],
+  );
+}
+
 // ---- Employees ----
 export async function listEmployees(): Promise<Employee[]> {
   const db = await getDb();
@@ -238,6 +247,7 @@ export async function createEmployee(emp: Omit<Employee, 'id'> & { id?: string }
   const db = await getDb();
   const id = emp.id || rid();
   await db.execute(INSERT_EMPLOYEE, employeeValues(id, emp));
+  await audit(db, 'create', 'employees', id, emp.fullName);
   return { id };
 }
 
@@ -256,6 +266,7 @@ export async function createEmployeesBulk(rows: (Omit<Employee, 'id'> & { id?: s
     await db.execute('ROLLBACK');
     throw e;
   }
+  await audit(db, 'import', 'employees', null, `${ids.length}`);
   return { ids };
 }
 export async function updateEmployeeRow(id: string, e: Partial<Employee>): Promise<void> {
@@ -264,10 +275,12 @@ export async function updateEmployeeRow(id: string, e: Partial<Employee>): Promi
     'UPDATE employees SET full_name = ?, position = ?, department = ?, status = ?, hire_date = ?, tab_number = ?, birth_date = ?, payment_type = ?, salary = ?, rate = ? WHERE id = ?',
     [e.fullName, e.position, e.department, e.status, e.hireDate, e.tabNumber ?? null, e.birthDate ?? null, e.paymentType ?? 'salary', e.salary ?? 0, e.rate ?? 1, id],
   );
+  await audit(db, 'update', 'employees', id, e.fullName ?? null);
 }
 export async function deleteEmployeeRow(id: string): Promise<void> {
   const db = await getDb();
   await db.execute('DELETE FROM employees WHERE id = ?', [id]);
+  await audit(db, 'delete', 'employees', id, null);
 }
 
 // ---- Departments ----
@@ -414,6 +427,7 @@ export async function createEntity(table: string, data: any): Promise<{ id: stri
   const db = await getDb();
   const id = data.id || rid();
   await db.execute(insertSql(entity), [id, ...objectToValues(entity, data)]);
+  if (entity.table !== AUDIT_TABLE) await audit(db, 'create', entity.table, id, null);
   return { id };
 }
 
@@ -424,6 +438,7 @@ export async function updateEntity(table: string, id: string, patch: any): Promi
   if (!update) return;
   const db = await getDb();
   await db.execute(update.sql, [...update.values, id]);
+  if (entity.table !== AUDIT_TABLE) await audit(db, 'update', entity.table, id, Object.keys(patch).join(', '));
 }
 
 export async function deleteEntity(table: string, id: string): Promise<void> {
@@ -431,6 +446,7 @@ export async function deleteEntity(table: string, id: string): Promise<void> {
   if (!entity) throw new Error(`Неизвестная таблица: ${table}`);
   const db = await getDb();
   await db.execute(`DELETE FROM ${entity.table} WHERE id = ?`, [id]);
+  if (entity.table !== AUDIT_TABLE) await audit(db, 'delete', entity.table, id, null);
 }
 
 // ---- Кадровые операции ----
@@ -465,6 +481,7 @@ export async function applyMovement(movement: any): Promise<{ id: string; moveme
     throw e;
   }
 
+  await audit(db, 'movement', 'employees', movement.employeeId, `${movement.type} · ${movement.date}`);
   return { id, movement: { ...record, id }, employeePatch: patch };
 }
 
@@ -474,8 +491,10 @@ export async function login(email: string, password: string): Promise<LoginResul
   const rows = await db.select<any[]>('SELECT * FROM users WHERE email = ?', [email]);
   const user = rows[0];
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    await audit(db, 'login_failed', 'auth', null, email);
     throw new Error('Неверный email или пароль');
   }
+  await audit(db, 'login', 'auth', user.id, user.email);
   return { user: { id: user.id, email: user.email, name: user.name, role: user.role }, token: 'local' };
 }
 export async function changePassword(email: string, currentPassword: string, newPassword: string): Promise<void> {
@@ -486,6 +505,7 @@ export async function changePassword(email: string, currentPassword: string, new
     throw new Error('Неверный текущий пароль');
   }
   await db.execute('UPDATE users SET password_hash = ? WHERE id = ?', [bcrypt.hashSync(newPassword, 10), user.id]);
+  await audit(db, 'password_change', 'auth', user.id, user.email);
 }
 export async function resetSystem(adminPassword: string): Promise<void> {
   const db = await getDb();
@@ -497,7 +517,9 @@ export async function resetSystem(adminPassword: string): Promise<void> {
   // users намеренно не трогаем: учётная запись владельца должна пережить
   // сброс, иначе в приложение будет не войти. Список совпадает с серверным
   // RESETTABLE_TABLES в src/db/sqlite.ts.
-  for (const table of ['employees', 'departments', 'positions', 'templates', 'timesheets', 'archives', ...ENTITIES.map((e) => e.table)]) {
+  const tables = ['employees', 'departments', 'positions', 'templates', 'timesheets', 'archives', ...ENTITIES.map((e) => e.table)];
+  for (const table of tables) {
     await db.execute(`DELETE FROM ${table}`);
   }
+  await audit(db, 'reset', 'system', null, tables.join(', '));
 }

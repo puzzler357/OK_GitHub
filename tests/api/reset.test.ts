@@ -1,12 +1,13 @@
+// Первой строкой: модуль подменяет DB_PATH до загрузки серверных модулей.
+import './resetDbPath';
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
 import { api, startApi, stopApi } from './helpers';
 import { ENTITIES } from '../../src/data/entities';
 
-// ВАЖНО: этот файл чистит базу и не восстанавливает её — посев выполняется
-// один раз за жизнь файла БД, вернуть демо-данные после сброса нельзя.
-// Файлы тестов идут последовательно (fileParallelism: false) в порядке имён,
-// поэтому reset.test.ts должен оставаться последним по алфавиту среди
-// tests/api/*.test.ts. Новый файл, сортирующийся после него, получит пустую базу.
+// Файл работает на собственной базе (см. resetDbPath.ts): он чистит все
+// таблицы, а посев выполняется один раз за жизнь файла БД. На общей базе он
+// ломал бы любой тест, выполненный после него, — а порядок файлов vitest не
+// гарантирует, сортировка идёт по размеру, не по имени.
 
 const EMAIL = 'admin@global.tech';
 const PASSWORD = 'password123';
@@ -54,8 +55,15 @@ describe('POST /api/auth/reset-system', () => {
     expect(status).toBe(200);
 
     for (const route of routes) {
+      if (route === '/api/audit-log') continue;
       expect((await api('GET', route)).body).toEqual([]);
     }
+
+    // Журнал тоже очищается, но сам факт сброса в него сразу записывается —
+    // иначе самое значимое действие в системе не оставляло бы следа.
+    const journal = (await api('GET', '/api/audit-log')).body;
+    expect(journal).toHaveLength(1);
+    expect(journal[0]).toMatchObject({ action: 'reset', entity: 'system' });
   });
 
   it('учётная запись владельца переживает сброс', async () => {

@@ -532,6 +532,7 @@ export const tk = {
         resetError: "Maglumatlary arassalamakda ýalňyşlyk"
       },
       audit: {
+        empty: "Ýazgy ýok",
         title: "Audit žurnaly",
         subtitle: "Ulgamdaky ähli möhüm üýtgeşmeleriň ýazgysy",
         actionType: "Amalyň görnüşi",

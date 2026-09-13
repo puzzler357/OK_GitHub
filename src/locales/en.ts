@@ -532,6 +532,7 @@ export const en = {
         resetError: "Failed to reset data"
       },
       audit: {
+        empty: "No records",
         title: "Audit log",
         subtitle: "Record of all critical changes in the system",
         actionType: "Action type",

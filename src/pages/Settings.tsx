@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store/useAppStore';
-import { useDatabaseStore } from '../store/useDatabaseStore';
+import { useDatabaseStore, TABLES } from '../store/useDatabaseStore';
+import type { AuditEntry } from '../store/useDatabaseStore';
+import { exportToExcel } from '../lib/excel';
 import { useMoney } from '../lib/money';
 import type { CurrencyDecimals, CurrencyPosition, ThousandsSeparator } from '../lib/money';
 import * as api from '../data';
@@ -22,11 +24,50 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState('general');
 
   
-  const mockAudit = [
-    { id: 1, date: '2023-10-25 14:32', user: 'admin', action: 'Изменение настроек', entity: 'Система', diff: 'theme: light -> dark' },
-    { id: 2, date: '2023-10-25 12:15', user: 'hr_manager', action: 'Добавление сотрудника', entity: 'Сотрудники', diff: '+ id: 1042' },
-    { id: 3, date: '2023-10-24 09:00', user: 'admin', action: 'Вход в систему', entity: 'Авторизация', diff: 'Успешно' },
-  ];
+  const { auditLog, createIn } = useDatabaseStore();
+
+  // Фильтры журнала. Раньше оба селекта и поле даты были декорацией.
+  const [auditAction, setAuditAction] = useState('all');
+  const [auditEntity, setAuditEntity] = useState('all');
+  const [auditFrom, setAuditFrom] = useState('');
+
+  const auditActions = useMemo(
+    () => Array.from(new Set(auditLog.map(a => a.action))).sort(),
+    [auditLog],
+  );
+  const auditEntities = useMemo(
+    () => Array.from(new Set(auditLog.map(a => a.entity))).sort(),
+    [auditLog],
+  );
+
+  const filteredAudit = useMemo(() => auditLog.filter(a => {
+    if (auditAction !== 'all' && a.action !== auditAction) return false;
+    if (auditEntity !== 'all' && a.entity !== auditEntity) return false;
+    // ts хранится в ISO, поэтому сравнение строк по префиксу даты корректно.
+    if (auditFrom && a.ts.slice(0, 10) < auditFrom) return false;
+    return true;
+  }), [auditLog, auditAction, auditEntity, auditFrom]);
+
+  const handleAuditExport = async () => {
+    await exportToExcel(filteredAudit.map(a => ({
+      [t('settings.audit.datetime')]: a.ts.replace('T', ' ').slice(0, 19),
+      [t('settings.audit.action')]: a.action,
+      [t('settings.audit.entity')]: a.entity,
+      [t('settings.audit.diff')]: a.diff ?? '',
+    })), 'AuditLog');
+  };
+
+  // Изменения оформления приходят с экрана, а не из слоя данных, поэтому
+  // пишутся здесь — единственное место, где журнал пополняет интерфейс.
+  const logSetting = (key: string, value: string) => {
+    void createIn<AuditEntry>(TABLES.auditLog, {
+      ts: new Date().toISOString(),
+      action: 'settings',
+      entity: 'appearance',
+      entityId: key,
+      diff: `${key}: ${value}`,
+    });
+  };
 
   const mockBackups = [
     { id: 1, file: 'backup_20231025_0300.sql.gz', size: '145 MB', created: '25.10.2023 03:00' },
@@ -87,7 +128,7 @@ export default function Settings() {
                   <label className="block text-sm font-medium mb-2 text-secondary">{t('settings.language')}</label>
                   <select 
                     value={language} 
-                    onChange={(e) => setLanguage(e.target.value)}
+                    onChange={(e) => { setLanguage(e.target.value); logSetting('language', e.target.value); }}
                     className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
                   >
                     <option value="ru">Русский</option>
@@ -293,27 +334,46 @@ export default function Settings() {
                   <div className="p-4 border-b border-line flex items-end gap-4 bg-surface">
                     <div className="flex-1">
                       <label className="block text-xs font-medium text-muted mb-2">{t('settings.audit.actionType')}</label>
-                      <select className="w-full bg-app border border-line rounded-xl px-4 py-2 text-sm focus:outline-none text-secondary appearance-none">
-                        <option>{t('settings.audit.all')}</option>
+                      <select
+                        value={auditAction}
+                        onChange={(e) => setAuditAction(e.target.value)}
+                        className="w-full bg-app border border-line rounded-xl px-4 py-2 text-sm focus:outline-none text-secondary"
+                      >
+                        <option value="all">{t('settings.audit.all')}</option>
+                        {auditActions.map(a => <option key={a} value={a}>{a}</option>)}
                       </select>
                     </div>
                     <div className="flex-1">
                       <label className="block text-xs font-medium text-muted mb-2">{t('settings.audit.entity')}</label>
-                      <select className="w-full bg-app border border-line rounded-xl px-4 py-2 text-sm focus:outline-none text-secondary appearance-none">
-                        <option>{t('settings.audit.all')}</option>
+                      <select
+                        value={auditEntity}
+                        onChange={(e) => setAuditEntity(e.target.value)}
+                        className="w-full bg-app border border-line rounded-xl px-4 py-2 text-sm focus:outline-none text-secondary"
+                      >
+                        <option value="all">{t('settings.audit.all')}</option>
+                        {auditEntities.map(e => <option key={e} value={e}>{e}</option>)}
                       </select>
                     </div>
                     <div className="flex-1">
                       <label className="block text-xs font-medium text-muted mb-2">{t('settings.audit.dateFrom')}</label>
-                      <div className="relative">
-                        <input type="text" placeholder={t('settings.audit.datePlaceholder')} className="w-full bg-app border border-line rounded-xl px-4 py-2 text-sm focus:outline-none text-secondary" />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                        </div>
-                      </div>
+                      <input
+                        type="date"
+                        value={auditFrom}
+                        onChange={(e) => setAuditFrom(e.target.value)}
+                        className="w-full bg-app border border-line rounded-xl px-4 py-2 text-sm focus:outline-none text-secondary"
+                      />
                     </div>
-                    <button className="bg-accent-500/20 text-accent-400 border border-accent-500/30 hover:bg-accent-500/30 px-6 py-2 rounded-xl text-sm font-medium transition-colors h-[38px]">
-                      {t('common.apply')}
+                    <button
+                      onClick={() => { setAuditAction('all'); setAuditEntity('all'); setAuditFrom(''); }}
+                      className="bg-surface-3 hover:bg-surface-hover text-secondary px-4 py-2 rounded-xl text-sm font-medium transition-colors h-[38px]"
+                    >
+                      {t('common.reset')}
+                    </button>
+                    <button
+                      onClick={handleAuditExport}
+                      className="bg-accent-500/20 text-accent-400 border border-accent-500/30 hover:bg-accent-500/30 px-6 py-2 rounded-xl text-sm font-medium transition-colors h-[38px]"
+                    >
+                      {t('common.export')}
                     </button>
                   </div>
 
@@ -328,15 +388,23 @@ export default function Settings() {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockAudit.map(a => (
+                      {filteredAudit.slice(0, 200).map(a => (
                         <tr key={a.id} className="border-b border-line hover:bg-surface-hover">
-                          <td className="p-table text-table">{a.date}</td>
-                          <td className="p-table text-accent-400">{a.user}</td>
+                          <td className="p-table text-table whitespace-nowrap">{a.ts.replace('T', ' ').slice(0, 19)}</td>
+                          {/* Приложение однопользовательское: действующее лицо — владелец устройства. */}
+                          <td className="p-table text-accent-400">{user?.name || t('user.owner')}</td>
                           <td className="p-table text-table">{a.action}</td>
                           <td className="p-table text-table">{a.entity}</td>
-                          <td className="p-table font-mono text-xs">{a.diff}</td>
+                          <td className="p-table font-mono text-xs">{a.diff || a.entityId || '—'}</td>
                         </tr>
                       ))}
+                      {filteredAudit.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="p-table text-table text-center text-muted py-8">
+                            {t('settings.audit.empty')}
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -443,7 +511,7 @@ export default function Settings() {
                   {(['light', 'dark', 'system'] as const).map((tOpt) => (
                     <button
                       key={tOpt}
-                      onClick={() => setTheme(tOpt)}
+                      onClick={() => { setTheme(tOpt); logSetting('theme', tOpt); }}
                       className={`relative p-6 rounded-2xl border flex flex-col items-center justify-center gap-3 transition-colors ${
                         theme === tOpt 
                           ? 'border-accent-500 bg-accent-500/10 text-accent-400' 
@@ -475,7 +543,7 @@ export default function Settings() {
                     return (
                       <div 
                         key={color}
-                        onClick={() => setAccentColor(color)}
+                        onClick={() => { setAccentColor(color); logSetting('accentColor', color); }}
                         className={`w-8 h-8 rounded-full cursor-pointer hover:scale-110 transition-transform flex items-center justify-center text-white ${colorClasses} ${
                           accentColor === color ? 'ring-2 ring-offset-2 ring-offset-[var(--surface-2)]' : ''
                         }`}
@@ -494,7 +562,7 @@ export default function Settings() {
                   {(['compact', 'standard', 'spacious'] as const).map(d => (
                     <div 
                       key={d}
-                      onClick={() => setDensity(d)}
+                      onClick={() => { setDensity(d); logSetting('density', d); }}
                       className={`rounded-xl p-4 cursor-pointer transition-colors ${
                         density === d 
                           ? 'border border-accent-500 bg-accent-500/10' 
@@ -515,24 +583,24 @@ export default function Settings() {
               <div className="border border-line rounded-2xl p-6 bg-surface-2">
                 <h3 className="text-sm font-medium mb-6 text-primary">{t('settings.appearance.fontSize')}</h3>
                 <div className="flex items-center gap-4 px-2">
-                  <span className="text-xs font-medium text-muted cursor-pointer" onClick={() => setFontSize('small')}>A</span>
+                  <span className="text-xs font-medium text-muted cursor-pointer" onClick={() => { setFontSize('small'); logSetting('fontSize', 'small'); }}>A</span>
                   <div className="flex-1 relative h-2 bg-surface-3 rounded-full flex items-center">
                     <div className="absolute top-0 left-0 h-full bg-accent-500 rounded-full transition-all" style={{ width: fontSize === 'small' ? '0%' : fontSize === 'standard' ? '50%' : '100%' }}></div>
                     
                     <div 
-                      onClick={() => setFontSize('small')}
+                      onClick={() => { setFontSize('small'); logSetting('fontSize', 'small'); }}
                       className={`absolute left-0 w-4 h-4 rounded-full cursor-pointer -translate-x-1/2 ${fontSize === 'small' ? 'bg-accent-400 ring-4 ring-accent-500/30 shadow-sm' : 'bg-transparent'}`}
                     ></div>
                     <div 
-                      onClick={() => setFontSize('standard')}
+                      onClick={() => { setFontSize('standard'); logSetting('fontSize', 'standard'); }}
                       className={`absolute left-1/2 w-4 h-4 rounded-full cursor-pointer -translate-x-1/2 ${fontSize === 'standard' ? 'bg-accent-400 ring-4 ring-accent-500/30 shadow-sm' : 'bg-transparent'}`}
                     ></div>
                     <div 
-                      onClick={() => setFontSize('large')}
+                      onClick={() => { setFontSize('large'); logSetting('fontSize', 'large'); }}
                       className={`absolute left-full w-4 h-4 rounded-full cursor-pointer -translate-x-1/2 ${fontSize === 'large' ? 'bg-accent-400 ring-4 ring-accent-500/30 shadow-sm' : 'bg-transparent'}`}
                     ></div>
                   </div>
-                  <span className="text-lg font-medium text-muted cursor-pointer" onClick={() => setFontSize('large')}>A</span>
+                  <span className="text-lg font-medium text-muted cursor-pointer" onClick={() => { setFontSize('large'); logSetting('fontSize', 'large'); }}>A</span>
                 </div>
                 <div className="flex justify-between mt-3 px-2">
                   <span className="text-xs text-muted">{t('settings.appearance.small')}</span>

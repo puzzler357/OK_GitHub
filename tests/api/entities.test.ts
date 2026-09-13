@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
 import { api, startApi, stopApi } from './helpers';
-import { ENTITIES } from '../../src/data/entities';
+import { ENTITIES, AUDIT_TABLE } from '../../src/data/entities';
 
 beforeAll(async () => {
   await startApi();
@@ -74,10 +74,51 @@ describe('булевы поля', () => {
 });
 
 describe('посев экранов', () => {
-  it('заполняет все семь таблиц, чтобы экраны не открывались пустыми', async () => {
-    for (const entity of ENTITIES) {
+  it('заполняет таблицы экранов, чтобы они не открывались пустыми', async () => {
+    // Журнал аудита в посев не входит намеренно: он наполняется сам, а
+    // выдуманная история действий была бы прямой ложью о том, что произошло.
+    for (const entity of ENTITIES.filter((e) => e.table !== AUDIT_TABLE)) {
       const { body } = await api('GET', `/api/${entity.route}`);
       expect(body.length, `таблица ${entity.table} пуста`).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('журнал аудита', () => {
+  it('пишется вместе с изменением, а не по просьбе экрана', async () => {
+    const before = (await api('GET', '/api/audit-log')).body.length;
+
+    const created = await api('POST', '/api/employees', {
+      fullName: 'Аудит Тест', position: 'Инженер', department: 'IT', status: 'active', hireDate: '2026-03-01',
+    });
+    const id: string = created.body.id;
+
+    const afterCreate = (await api('GET', '/api/audit-log')).body;
+    expect(afterCreate.length).toBe(before + 1);
+    expect(afterCreate[0]).toMatchObject({ action: 'create', entity: 'employees', entityId: id });
+
+    await api('DELETE', `/api/employees/${id}`);
+    const afterDelete = (await api('GET', '/api/audit-log')).body;
+    expect(afterDelete[0]).toMatchObject({ action: 'delete', entity: 'employees', entityId: id });
+  });
+
+  it('фиксирует вход и неудачную попытку входа', async () => {
+    await api('POST', '/api/auth/login', { email: 'admin@global.tech', password: 'password123' });
+    expect((await api('GET', '/api/audit-log')).body[0]).toMatchObject({ action: 'login', entity: 'auth' });
+
+    await api('POST', '/api/auth/login', { email: 'admin@global.tech', password: 'неверный' });
+    expect((await api('GET', '/api/audit-log')).body[0]).toMatchObject({ action: 'login_failed', entity: 'auth' });
+  });
+
+  it('записывает кадровую операцию', async () => {
+    const moved = await api('POST', '/api/movements/apply', {
+      employeeId: '1', type: 'transfer', date: '2026-04-01', toPosition: 'Тимлид', toDepartment: 'IT', toSalary: 700000,
+    });
+    expect(moved.status).toBe(200);
+
+    const [latest] = (await api('GET', '/api/audit-log')).body;
+    expect(latest).toMatchObject({ action: 'movement', entity: 'employees', entityId: '1' });
+
+    await api('DELETE', `/api/movements/${moved.body.id}`);
   });
 });

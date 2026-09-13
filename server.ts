@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { createServer as createViteServer } from 'vite';
 import db, { RESETTABLE_TABLES } from './src/db/sqlite';
-import { ENTITIES, ENTITY_BY_TABLE, insertSql, selectSql, updateSql, rowToObject, objectToValues } from './src/data/entities';
+import { ENTITIES, ENTITY_BY_TABLE, AUDIT_TABLE, insertSql, selectSql, updateSql, rowToObject, objectToValues } from './src/data/entities';
 import { employeePatchFor, employeeUpdate } from './src/data/movements';
 
 export const app = express();
@@ -16,15 +16,31 @@ const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-local-key-2024';
 app.use(cors());
 app.use(express.json());
 
+// Журнал аудита пишется здесь, а не на экранах: событие должно попадать в
+// журнал вместе с самим изменением, а не тогда, когда клиент про это вспомнит.
+const insertAudit = () => db.prepare(
+  'INSERT INTO audit_log (id, ts, action, entity, entity_id, diff) VALUES (?, ?, ?, ?, ?, ?)',
+);
+
+function audit(action: string, entity: string, entityId?: string | null, diff?: string | null) {
+  insertAudit().run(
+    Math.random().toString(36).substring(2, 12),
+    new Date().toISOString(),
+    action, entity, entityId ?? null, diff ?? null,
+  );
+}
+
 // API Auth
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;
   
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    audit('login_failed', 'auth', null, String(email ?? ''));
     return res.status(401).json({ error: 'Неверный email или пароль' });
   }
-  
+
+  audit('login', 'auth', user.id, user.email);
   const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
   res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role }, token });
 });
@@ -37,6 +53,7 @@ app.post('/api/auth/change-password', (req, res) => {
     return res.status(401).json({ error: 'Неверный текущий пароль' });
   }
   
+  audit('password_change', 'auth', user.id, user.email);
   const newHash = bcrypt.hashSync(newPassword, 10);
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, user.id);
   
@@ -60,6 +77,7 @@ app.post('/api/auth/reset-system', (req, res) => {
   })();
 
   
+  audit('reset', 'system', null, RESETTABLE_TABLES.join(', '));
   res.json({ success: true, message: 'Все данные системы были успешно сброшены' });
 });
 
@@ -73,20 +91,26 @@ for (const entity of ENTITIES) {
     res.json(db.prepare(selectSql(entity)).all().map((row: any) => rowToObject(entity, row)));
   });
 
+  // Сам журнал в журнал не пишется, иначе он зациклится на себе.
+  const logged = entity.table !== AUDIT_TABLE;
+
   app.post(base, (req, res) => {
     const id = req.body.id || Math.random().toString(36).substring(7);
     db.prepare(insertSql(entity)).run(id, ...objectToValues(entity, req.body));
+    if (logged) audit('create', entity.table, id, null);
     res.json({ id });
   });
 
   app.put(`${base}/:id`, (req, res) => {
     const update = updateSql(entity, req.body);
     if (update) db.prepare(update.sql).run(...update.values, req.params.id);
+    if (logged) audit('update', entity.table, req.params.id, Object.keys(req.body).join(', '));
     res.json({ success: true });
   });
 
   app.delete(`${base}/:id`, (req, res) => {
     db.prepare(`DELETE FROM ${entity.table} WHERE id = ?`).run(req.params.id);
+    if (logged) audit('delete', entity.table, req.params.id, null);
     res.json({ success: true });
   });
 }
@@ -124,6 +148,7 @@ app.post('/api/movements/apply', (req, res) => {
     }
   })();
 
+  audit('movement', 'employees', movement.employeeId, `${movement.type} · ${movement.date}`);
   res.json({ id, movement: { ...record, id }, employeePatch: patch });
 });
 
@@ -155,6 +180,7 @@ app.post('/api/employees', (req, res) => {
   const { id, fullName, position, department, status, hireDate, tabNumber, birthDate, paymentType = 'salary', salary = 0, rate = 1 } = req.body;
   const newId = id || newEmployeeId();
   insertEmployee().run(newId, fullName, position, department, status, hireDate, tabNumber ?? null, birthDate, paymentType, salary, rate);
+  audit('create', 'employees', newId, fullName);
   res.json({ id: newId });
 });
 
@@ -173,6 +199,7 @@ app.post('/api/employees/bulk', (req, res) => {
     }
   })();
 
+  audit('import', 'employees', null, `${ids.length}`);
   res.json({ ids });
 });
 
@@ -180,11 +207,13 @@ app.put('/api/employees/:id', (req, res) => {
   const { fullName, position, department, status, hireDate, tabNumber, birthDate, paymentType, salary, rate } = req.body;
   db.prepare('UPDATE employees SET full_name = ?, position = ?, department = ?, status = ?, hire_date = ?, tab_number = ?, birth_date = ?, payment_type = ?, salary = ?, rate = ? WHERE id = ?')
     .run(fullName, position, department, status, hireDate, tabNumber ?? null, birthDate, paymentType, salary, rate, req.params.id);
+  audit('update', 'employees', req.params.id, fullName);
   res.json({ success: true });
 });
 
 app.delete('/api/employees/:id', (req, res) => {
   db.prepare('DELETE FROM employees WHERE id = ?').run(req.params.id);
+  audit('delete', 'employees', req.params.id, null);
   res.json({ success: true });
 });
 
@@ -199,14 +228,17 @@ app.post('/api/departments', (req, res) => {
   const { id, name, parentId } = req.body;
   const newId = id || Math.random().toString(36).substring(7);
   db.prepare('INSERT INTO departments (id, name, parent_id) VALUES (?, ?, ?)').run(newId, name, parentId || null);
+  audit('create', 'departments', newId, name);
   res.json({ id: newId });
 });
 app.put('/api/departments/:id', (req, res) => {
   db.prepare('UPDATE departments SET name = ?, parent_id = ? WHERE id = ?').run(req.body.name, req.body.parentId || null, req.params.id);
+  audit('update', 'departments', req.params.id, req.body.name);
   res.json({ success: true });
 });
 app.delete('/api/departments/:id', (req, res) => {
   db.prepare('DELETE FROM departments WHERE id = ?').run(req.params.id);
+  audit('delete', 'departments', req.params.id, null);
   res.json({ success: true });
 });
 
@@ -221,15 +253,18 @@ app.post('/api/positions', (req, res) => {
   const { id, departmentId, title, maxCount, salary } = req.body;
   const newId = id || Math.random().toString(36).substring(7);
   db.prepare('INSERT INTO positions (id, department_id, title, max_count, salary) VALUES (?, ?, ?, ?, ?)').run(newId, departmentId, title, maxCount, salary);
+  audit('create', 'positions', newId, title);
   res.json({ id: newId });
 });
 app.put('/api/positions/:id', (req, res) => {
   const { departmentId, title, maxCount, salary } = req.body;
   db.prepare('UPDATE positions SET department_id = ?, title = ?, max_count = ?, salary = ? WHERE id = ?').run(departmentId, title, maxCount, salary, req.params.id);
+  audit('update', 'positions', req.params.id, title);
   res.json({ success: true });
 });
 app.delete('/api/positions/:id', (req, res) => {
   db.prepare('DELETE FROM positions WHERE id = ?').run(req.params.id);
+  audit('delete', 'positions', req.params.id, null);
   res.json({ success: true });
 });
 
@@ -248,6 +283,7 @@ app.post('/api/templates', (req, res) => {
   const newId = id || Math.random().toString(36).substring(7);
   db.prepare('INSERT INTO templates (id, name, blocks) VALUES (?, ?, ?)')
     .run(newId, name, JSON.stringify(blocks));
+  audit('create', 'templates', newId, name);
   res.json({ id: newId });
 });
 
@@ -255,11 +291,13 @@ app.put('/api/templates/:id', (req, res) => {
   const { name, blocks } = req.body;
   db.prepare('UPDATE templates SET name = ?, blocks = ? WHERE id = ?')
     .run(name, JSON.stringify(blocks), req.params.id);
+  audit('update', 'templates', req.params.id, name);
   res.json({ success: true });
 });
 
 app.delete('/api/templates/:id', (req, res) => {
   db.prepare('DELETE FROM templates WHERE id = ?').run(req.params.id);
+  audit('delete', 'templates', req.params.id, null);
   res.json({ success: true });
 });
 

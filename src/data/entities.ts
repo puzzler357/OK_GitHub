@@ -142,6 +142,20 @@ export const ENTITIES: EntityDef[] = [
     ],
   },
   {
+    table: 'audit_log',
+    stateKey: 'auditLog',
+    route: 'audit-log',
+    orderBy: 'ts DESC',
+    columns: [
+      text('ts', 'ts'),
+      // login | password_change | reset | create | update | delete | settings
+      text('action', 'action'),
+      text('entity', 'entity'),
+      text('entityId', 'entity_id', false),
+      text('diff', 'diff', false),
+    ],
+  },
+  {
     table: 'kb_categories',
     stateKey: 'kbCategories',
     route: 'kb-categories',
@@ -169,6 +183,9 @@ export const ENTITIES: EntityDef[] = [
 
 export const ENTITY_BY_TABLE = new Map(ENTITIES.map((e) => [e.table, e]));
 
+/** Таблица журнала: её изменения в журнал не пишутся, иначе он зациклится. */
+export const AUDIT_TABLE = 'audit_log';
+
 /** Имена таблиц для экранов — чтобы не разбрасывать строковые литералы. */
 export const TABLES = {
   candidates: 'candidates',
@@ -177,6 +194,7 @@ export const TABLES = {
   goals: 'goals',
   reviews: 'reviews',
   movements: 'movements',
+  auditLog: 'audit_log',
   kbCategories: 'kb_categories',
   kbArticles: 'kb_articles',
 } as const;

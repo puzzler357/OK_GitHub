@@ -144,6 +144,18 @@ export interface Movement {
   reason?: string;
 }
 
+/** Запись журнала аудита. Пишется слоем данных, а не экранами. */
+export interface AuditEntry {
+  id: string;
+  /** ISO-время события. */
+  ts: string;
+  action: string;
+  entity: string;
+  entityId?: string;
+  /** Человекочитаемое описание изменения. */
+  diff?: string;
+}
+
 export interface KbCategory {
   id: string;
   name: string;
