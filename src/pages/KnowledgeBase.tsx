@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, Book, FileText, ChevronRight, Hash, Bookmark, ArrowLeft, Save, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
+import { useDatabaseStore, TABLES } from '../store/useDatabaseStore';
+import type { KbArticle } from '../store/useDatabaseStore';
 
 const MenuBar = ({ editor }: { editor: any }) => {
   const { t } = useTranslation();
@@ -93,11 +95,21 @@ const MenuBar = ({ editor }: { editor: any }) => {
   );
 };
 
+// Категории в базе хранят только имя и порядок; иконка — оформление,
+// поэтому берётся по кругу из фиксированного набора.
+const CATEGORY_ICONS = [Book, FileText, Hash, Bookmark];
+
 export default function KnowledgeBase() {
   const { t } = useTranslation();
+  const { kbCategories, kbArticles, createIn, updateIn } = useDatabaseStore();
+
   const [isWriting, setIsWriting] = useState(false);
   const [articleTitle, setArticleTitle] = useState('');
-  const [articleCategory, setArticleCategory] = useState('1');
+  const [articleCategory, setArticleCategory] = useState('');
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [viewingArticleId, setViewingArticleId] = useState<string | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -113,38 +125,40 @@ export default function KnowledgeBase() {
     },
   });
 
-  const categories = [
-    { id: 1, name: 'HR Политики', count: 12, icon: Book },
-    { id: 2, name: 'Инструкции (IT)', count: 8, icon: FileText },
-    { id: 3, name: 'Справочник сотрудника', count: 5, icon: Hash },
-    { id: 4, name: 'FAQ', count: 24, icon: Bookmark },
-  ];
+  useEffect(() => {
+    if (!articleCategory && kbCategories.length > 0) setArticleCategory(kbCategories[0].id);
+  }, [kbCategories, articleCategory]);
 
-  const [articles, setArticles] = useState([
-    { id: 1, title: 'Как оформить отпуск?', category: 'HR Политики', reads: 342, content: '<p>Для оформления отпуска необходимо написать заявление минимум за 14 дней.</p>' },
-    { id: 2, title: 'Настройка VPN', category: 'Инструкции (IT)', reads: 215, content: '<p>Инструкция по настройке корпоративного VPN на различных операционных системах.</p>' },
-    { id: 3, title: 'Правила компенсации расходов', category: 'HR Политики', reads: 189, content: '<p>Компенсация расходов на обучение и спорт производится после испытательного срока.</p>' },
-    { id: 4, title: 'ДМС: как воспользоваться', category: 'Справочник сотрудника', reads: 156, content: '<p>Медицинская страховка доступна всем сотрудникам через 3 месяца работы.</p>' },
-  ]);
+  const categoryName = (id?: string) => kbCategories.find(c => c.id === id)?.name ?? t('kb.general');
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [viewingArticle, setViewingArticle] = useState<any | null>(null);
+  // Счётчик статей считается по данным — раньше рядом с каждой категорией
+  // стояло фиксированное число (12/8/5/24), ни на что не реагировавшее.
+  const articleCount = (categoryId: string) => kbArticles.filter(a => a.categoryId === categoryId).length;
 
-  const handleSave = () => {
+  const viewingArticle = viewingArticleId ? kbArticles.find(a => a.id === viewingArticleId) ?? null : null;
+
+  const handleSave = async () => {
     if (!articleTitle) return;
-    const catName = categories.find(c => c.id.toString() === articleCategory)?.name || t('kb.general');
-    setArticles([...articles, {
-      id: Date.now(),
+    const now = new Date().toISOString().split('T')[0];
+
+    await createIn<KbArticle>(TABLES.kbArticles, {
+      categoryId: articleCategory || undefined,
       title: articleTitle,
-      category: catName,
+      contentHtml: editor?.getHTML() || '',
       reads: 0,
-      content: editor?.getHTML() || ''
-    }]);
-    alert(t('kb.saved'));
+      createdAt: now,
+      updatedAt: now,
+    });
+
     setIsWriting(false);
     setArticleTitle('');
     editor?.commands.setContent(`<p>${t('kb.editorPlaceholder')}</p>`);
+  };
+
+  const openArticle = (id: string, reads: number) => {
+    setViewingArticleId(id);
+    // Счётчик прочтений — реальное поле в базе, а не декорация.
+    void updateIn(TABLES.kbArticles, id, { reads: reads + 1 });
   };
 
   if (isWriting) {
@@ -152,7 +166,7 @@ export default function KnowledgeBase() {
       <div className="space-y-6 max-w-4xl mx-auto">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={() => setIsWriting(false)}
               className="p-2 bg-surface border border-line hover:bg-surface-hover rounded-xl transition-colors text-muted"
             >
@@ -186,12 +200,12 @@ export default function KnowledgeBase() {
             </div>
             <div>
               <label className="block text-sm font-medium text-muted mb-2">{t('kb.category')}</label>
-              <select 
+              <select
                 value={articleCategory}
                 onChange={e => setArticleCategory(e.target.value)}
                 className="w-full bg-app border border-line rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 transition-colors"
               >
-                {categories.map(cat => (
+                {kbCategories.map(cat => (
                   <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
@@ -210,10 +224,10 @@ export default function KnowledgeBase() {
     );
   }
 
-  const filteredArticles = articles.filter(article => {
-    const matchesSearch = article.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          article.content.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory ? article.category === selectedCategory : true;
+  const filteredArticles = kbArticles.filter(article => {
+    const haystack = `${article.title} ${article.contentHtml ?? ''}`.toLowerCase();
+    const matchesSearch = haystack.includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategoryId ? article.categoryId === selectedCategoryId : true;
     return matchesSearch && matchesCategory;
   });
 
@@ -221,8 +235,8 @@ export default function KnowledgeBase() {
     return (
       <div className="space-y-6 max-w-4xl mx-auto">
         <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setViewingArticle(null)}
+          <button
+            onClick={() => setViewingArticleId(null)}
             className="p-2 bg-surface border border-line hover:bg-surface-hover rounded-xl transition-colors text-muted"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -231,10 +245,10 @@ export default function KnowledgeBase() {
         </div>
         <div className="bg-surface border border-line rounded-2xl p-8 prose prose-slate prose-invert max-w-none">
           <div className="flex items-center gap-2 mb-6 not-prose">
-            <span className="text-xs text-accent-400 bg-accent-500/10 px-2 py-1 rounded-md">{viewingArticle.category}</span>
+            <span className="text-xs text-accent-400 bg-accent-500/10 px-2 py-1 rounded-md">{categoryName(viewingArticle.categoryId)}</span>
             <span className="text-xs text-muted">{t('kb.reads', { count: viewingArticle.reads })}</span>
           </div>
-          <div dangerouslySetInnerHTML={{ __html: viewingArticle.content }} />
+          <div dangerouslySetInnerHTML={{ __html: viewingArticle.contentHtml ?? '' }} />
         </div>
       </div>
     );
@@ -257,8 +271,8 @@ export default function KnowledgeBase() {
 
       <div className="relative max-w-2xl mx-auto my-8">
         <Search className="w-6 h-6 absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
-        <input 
-          type="text" 
+        <input
+          type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t('kb.searchPh')}
@@ -267,22 +281,30 @@ export default function KnowledgeBase() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {categories.map(cat => (
-          <div key={cat.id} onClick={() => setSelectedCategory(selectedCategory === cat.name ? null : cat.name)} className={`${selectedCategory === cat.name ? 'bg-surface-3 border-accent-500' : 'bg-surface border-line'} hover:border-strong rounded-2xl p-6 cursor-pointer transition-colors group`}>
-            <div className="w-12 h-12 bg-surface-3 text-accent-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <cat.icon className="w-6 h-6" />
+        {kbCategories.map((cat, index) => {
+          const Icon = CATEGORY_ICONS[index % CATEGORY_ICONS.length];
+          const isSelected = selectedCategoryId === cat.id;
+          return (
+            <div
+              key={cat.id}
+              onClick={() => setSelectedCategoryId(isSelected ? null : cat.id)}
+              className={`${isSelected ? 'bg-surface-3 border-accent-500' : 'bg-surface border-line'} border hover:border-strong rounded-2xl p-6 cursor-pointer transition-colors group`}
+            >
+              <div className="w-12 h-12 bg-surface-3 text-accent-400 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <Icon className="w-6 h-6" />
+              </div>
+              <h3 className="font-semibold text-primary mb-1">{cat.name}</h3>
+              <p className="text-sm text-muted">{t('kb.articlesCount', { count: articleCount(cat.id) })}</p>
             </div>
-            <h3 className="font-semibold text-primary mb-1">{cat.name}</h3>
-            <p className="text-sm text-muted">{t('kb.articlesCount', { count: cat.count })}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="mt-8">
-        <h3 className="text-xl font-semibold text-primary mb-4">{searchQuery || selectedCategory ? t('kb.searchResults') : t('kb.popular')}</h3>
+        <h3 className="text-xl font-semibold text-primary mb-4">{searchQuery || selectedCategoryId ? t('kb.searchResults') : t('kb.popular')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredArticles.map(article => (
-            <div key={article.id} onClick={() => setViewingArticle(article)} className="bg-surface-2 border border-line hover:bg-surface-hover rounded-xl p-4 flex items-center justify-between cursor-pointer transition-colors">
+            <div key={article.id} onClick={() => openArticle(article.id, article.reads)} className="bg-surface-2 border border-line hover:bg-surface-hover rounded-xl p-4 flex items-center justify-between cursor-pointer transition-colors">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 bg-surface-3 rounded-lg flex items-center justify-center text-muted">
                   <FileText className="w-5 h-5" />
@@ -290,7 +312,7 @@ export default function KnowledgeBase() {
                 <div>
                   <h4 className="font-medium text-primary">{article.title}</h4>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-accent-400 bg-accent-500/10 px-2 py-0.5 rounded">{article.category}</span>
+                    <span className="text-xs text-accent-400 bg-accent-500/10 px-2 py-0.5 rounded">{categoryName(article.categoryId)}</span>
                     <span className="text-xs text-muted">• {t('kb.reads', { count: article.reads })}</span>
                   </div>
                 </div>
@@ -298,6 +320,12 @@ export default function KnowledgeBase() {
               <ChevronRight className="w-5 h-5 text-muted" />
             </div>
           ))}
+
+          {filteredArticles.length === 0 && (
+            <div className="p-8 text-center text-muted border border-dashed border-line rounded-xl md:col-span-2">
+              {t('kb.noArticles')}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -2,31 +2,22 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, Plus, Filter, MoreHorizontal, UserCheck, Calendar, Briefcase, X } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-
-interface Candidate {
-  id: string;
-  name: string;
-  position: string;
-  experience: string;
-  status: 'new' | 'screening' | 'interview' | 'offer' | 'hired' | 'rejected';
-}
-
-const initialCandidates: Candidate[] = [
-  { id: '1', name: 'Алексей Смирнов', position: 'Фронтенд разработчик', experience: '3 года', status: 'new' },
-  { id: '2', name: 'Елена Попова', position: 'UX/UI Дизайнер', experience: '5 лет', status: 'screening' },
-  { id: '3', name: 'Дмитрий Волков', position: 'Бэкенд разработчик', experience: '4 года', status: 'interview' },
-  { id: '4', name: 'Ольга Новикова', position: 'Менеджер проектов', experience: '6 лет', status: 'offer' },
-];
+import { useDatabaseStore, TABLES } from '../store/useDatabaseStore';
+import type { Candidate } from '../store/useDatabaseStore';
 
 export default function Recruiting() {
   const { t } = useTranslation();
+  // Все шесть статусов воронки достижимы: раньше колонок было четыре, и
+  // «Принят» с «Отказом» выставить было нечем.
   const columns = [
     { id: 'new', title: t('recruiting.col.new') },
     { id: 'screening', title: t('recruiting.col.screening') },
     { id: 'interview', title: t('recruiting.col.interview') },
     { id: 'offer', title: t('recruiting.col.offer') },
+    { id: 'hired', title: t('recruiting.col.hired') },
+    { id: 'rejected', title: t('recruiting.col.rejected') },
   ];
-  const [candidates, setCandidates] = useState<Candidate[]>(initialCandidates);
+  const { candidates, createIn, updateIn } = useDatabaseStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -34,62 +25,51 @@ export default function Recruiting() {
   const [newCandidate, setNewCandidate] = useState({ name: '', position: '', experience: '' });
 
   const uniquePositions = Array.from(new Set(candidates.map(c => c.position)));
-  
+
   const filteredCandidates = candidates.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchesSearch = c.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           c.position.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter = filters.position ? c.position === filters.position : true;
     return matchesSearch && matchesFilter;
   });
 
-  const handleAddCandidate = (e: React.FormEvent) => {
+  // Плитки считаются по данным. Раньше здесь стояли константы 12/48/8,
+  // не менявшиеся ни от чего.
+  const stats = {
+    openPositions: new Set(
+      candidates.filter(c => c.status !== 'hired' && c.status !== 'rejected').map(c => c.position),
+    ).size,
+    newApplicants: candidates.filter(c => c.status === 'new').length,
+    interviews: candidates.filter(c => c.status === 'interview').length,
+  };
+
+  const handleAddCandidate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCandidate.name || !newCandidate.position) return;
-    
-    setCandidates(prev => [...prev, {
-      id: Math.random().toString(36).substr(2, 9),
-      name: newCandidate.name,
+
+    await createIn<Candidate>(TABLES.candidates, {
+      fullName: newCandidate.name,
       position: newCandidate.position,
       experience: newCandidate.experience || t('recruiting.noExperience'),
-      status: 'new'
-    }]);
-    
+      status: 'new',
+      createdAt: new Date().toISOString().split('T')[0],
+    });
+
     setNewCandidate({ name: '', position: '', experience: '' });
     setIsModalOpen(false);
   };
 
   const onDragEnd = (result: DropResult) => {
     const { destination, source, draggableId } = result;
-
-    if (!destination) {
-      return;
-    }
-
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    ) {
-      return;
-    }
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
     const candidate = candidates.find(c => c.id === draggableId);
     if (!candidate) return;
 
-    const newCandidates = Array.from(candidates);
-    
-    // Update status
-    const updatedCandidate = { ...candidate, status: destination.droppableId as Candidate['status'] };
-    
-    // Remove from old array
-    const indexToRemove = newCandidates.findIndex(c => c.id === draggableId);
-    newCandidates.splice(indexToRemove, 1);
-    
-    // Add to new position
-    // Since we don't have a rigid global order but rather column-based arrays, we can just append or insert
-    // For simplicity, we just push to the end or keep natural order, but let's try to maintain array order somewhat
-    newCandidates.push(updatedCandidate);
-
-    setCandidates(newCandidates);
+    // Статус уходит в БД: перемещение карточки — кадровое решение,
+    // оно должно переживать перезагрузку.
+    void updateIn(TABLES.candidates, candidate.id, { status: destination.droppableId });
   };
 
   return (
@@ -174,7 +154,7 @@ export default function Recruiting() {
             </div>
             <div>
               <p className="text-sm text-muted">{t('recruiting.stats.openJobs')}</p>
-              <p className="text-2xl font-bold text-primary">12</p>
+              <p className="text-2xl font-bold text-primary">{stats.openPositions}</p>
             </div>
           </div>
         </div>
@@ -185,7 +165,7 @@ export default function Recruiting() {
             </div>
             <div>
               <p className="text-sm text-muted">{t('recruiting.stats.newApplicants')}</p>
-              <p className="text-2xl font-bold text-primary">48</p>
+              <p className="text-2xl font-bold text-primary">{stats.newApplicants}</p>
             </div>
           </div>
         </div>
@@ -196,7 +176,7 @@ export default function Recruiting() {
             </div>
             <div>
               <p className="text-sm text-muted">{t('recruiting.stats.interviews')}</p>
-              <p className="text-2xl font-bold text-primary">8</p>
+              <p className="text-2xl font-bold text-primary">{stats.interviews}</p>
             </div>
           </div>
         </div>
@@ -259,7 +239,7 @@ export default function Recruiting() {
             const columnCandidates = filteredCandidates.filter(c => c.status === col.id);
             
             return (
-              <div key={col.id} className="flex-1 min-w-[300px] bg-surface-2 border border-line rounded-2xl p-4 flex flex-col h-[600px]">
+              <div key={col.id} className="flex-1 min-w-[260px] bg-surface-2 border border-line rounded-2xl p-4 flex flex-col h-[600px]">
                 <div className="flex justify-between items-center mb-4 px-2">
                   <h3 className="font-semibold text-primary">{col.title}</h3>
                   <span className="bg-surface-3 text-muted text-xs px-2 py-1 rounded-full">
@@ -284,7 +264,7 @@ export default function Recruiting() {
                               className={`bg-surface-3 border border-line rounded-xl p-4 cursor-grab hover:border-accent-500/50 transition-colors ${snapshot.isDragging ? 'shadow-xl shadow-black/50 ring-2 ring-accent-500 rotate-2' : ''}`}
                             >
                               <div className="flex justify-between items-start mb-2">
-                                <h4 className="font-medium text-primary">{candidate.name}</h4>
+                                <h4 className="font-medium text-primary">{candidate.fullName}</h4>
                                 <button className="text-muted hover:text-secondary">
                                   <MoreHorizontal className="w-4 h-4" />
                                 </button>

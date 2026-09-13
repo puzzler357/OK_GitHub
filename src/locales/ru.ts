@@ -171,7 +171,9 @@ export const ru = {
         new: "Новые",
         screening: "Скрининг",
         interview: "Собеседование",
-        offer: "Оффер"
+        offer: "Оффер",
+        hired: "Принят",
+        rejected: "Отказ"
       }
     },
     timeoff: {
@@ -179,6 +181,10 @@ export const ru = {
       type: "Тип отсутствия",
       dates: "Даты (например, 01.09.2024 - 10.09.2024)",
       datesPh: "01.09.2024 - 10.09.2024",
+      dateFrom: "Дата начала",
+      dateTo: "Дата окончания",
+      employee: "Сотрудник",
+      noRequests: "Заявок пока нет",
       daysCount: "Количество дней",
       submit: "Отправить",
       manageTitle: "Управление отсутствиями",
@@ -233,6 +239,9 @@ export const ru = {
       }
     },
     onboarding: {
+      employee: "Сотрудник",
+      noTasks: "Задач пока нет",
+      saveComment: "Сохранить комментарий",
       title: "Адаптация и увольнение",
       subtitle: "Чек-листы Onboarding и Offboarding",
       active: "Активных процессов: {{count}}",
@@ -355,6 +364,11 @@ export const ru = {
       }
     },
     performance: {
+      employee: "Сотрудник",
+      noGoals: "Целей пока нет",
+      noReviews: "Оценок пока нет",
+      savedReviews: "Сохранённые оценки",
+      period: "Период",
       title: "Оценка эффективности (Performance Review)",
       subtitle: "Цели (KPI/OKR) и формы оценки 360°",
       launchReview: "Запустить ревью",
@@ -397,6 +411,7 @@ export const ru = {
       outstandingDesc: "Вы входите в 10% лучших сотрудников по результатам прошлого квартала."
     },
     kb: {
+      noArticles: "Статей пока нет",
       title: "База знаний",
       subtitle: "Внутренняя вики-система и портал сотрудника",
       writeArticle: "Написать статью",

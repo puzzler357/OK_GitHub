@@ -171,7 +171,9 @@ export const tk = {
         new: "Täze",
         screening: "Skrining",
         interview: "Söhbetdeşlik",
-        offer: "Teklip"
+        offer: "Teklip",
+        hired: "Kabul edildi",
+        rejected: "Ret edildi"
       }
     },
     timeoff: {
@@ -179,6 +181,10 @@ export const tk = {
       type: "Ýoklyk görnüşi",
       dates: "Seneler (meselem, 01.09.2024 - 10.09.2024)",
       datesPh: "01.09.2024 - 10.09.2024",
+      dateFrom: "Başlanýan sene",
+      dateTo: "Gutarýan sene",
+      employee: "Işgär",
+      noRequests: "Haýyşlar entek ýok",
       daysCount: "Günleriň sany",
       submit: "Ugrat",
       manageTitle: "Rugsatlary dolandyrmak",
@@ -233,6 +239,9 @@ export const tk = {
       }
     },
     onboarding: {
+      employee: "Işgär",
+      noTasks: "Meseleler entek ýok",
+      saveComment: "Belligi ýatda sakla",
       title: "Uýgunlaşma we işden çykmak",
       subtitle: "Onboarding we offboarding barlag sanawlary",
       active: "Işjeň prosesler: {{count}}",
@@ -355,6 +364,11 @@ export const tk = {
       }
     },
     performance: {
+      employee: "Işgär",
+      noGoals: "Maksatlar entek ýok",
+      noReviews: "Bahalar entek ýok",
+      savedReviews: "Saklanan bahalar",
+      period: "Döwür",
       title: "Netijeliligi bahalandyrmak (Performance Review)",
       subtitle: "Maksatlar (KPI/OKR) we 360° baha formalary",
       launchReview: "Syny başlat",
@@ -397,6 +411,7 @@ export const tk = {
       outstandingDesc: "Geçen çärýegiň netijeleri boýunça iň gowy 10% işgäriň hataryndasyňyz."
     },
     kb: {
+      noArticles: "Makalalar entek ýok",
       title: "Bilim binýady",
       subtitle: "Içerki wiki-ulgam we işgär portaly",
       writeArticle: "Makala ýaz",

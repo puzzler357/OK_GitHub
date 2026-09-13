@@ -171,7 +171,9 @@ export const en = {
         new: "New",
         screening: "Screening",
         interview: "Interview",
-        offer: "Offer"
+        offer: "Offer",
+        hired: "Hired",
+        rejected: "Rejected"
       }
     },
     timeoff: {
@@ -179,6 +181,10 @@ export const en = {
       type: "Absence type",
       dates: "Dates (e.g. 01.09.2024 - 10.09.2024)",
       datesPh: "01.09.2024 - 10.09.2024",
+      dateFrom: "Start date",
+      dateTo: "End date",
+      employee: "Employee",
+      noRequests: "No requests yet",
       daysCount: "Number of days",
       submit: "Submit",
       manageTitle: "Time-off management",
@@ -233,6 +239,9 @@ export const en = {
       }
     },
     onboarding: {
+      employee: "Employee",
+      noTasks: "No tasks yet",
+      saveComment: "Save comment",
       title: "Onboarding & Offboarding",
       subtitle: "Onboarding and offboarding checklists",
       active: "Active processes: {{count}}",
@@ -355,6 +364,11 @@ export const en = {
       }
     },
     performance: {
+      employee: "Employee",
+      noGoals: "No goals yet",
+      noReviews: "No reviews yet",
+      savedReviews: "Saved reviews",
+      period: "Period",
       title: "Performance Review",
       subtitle: "Goals (KPI/OKR) and 360° review forms",
       launchReview: "Launch review",
@@ -397,6 +411,7 @@ export const en = {
       outstandingDesc: "You are among the top 10% of employees for last quarter."
     },
     kb: {
+      noArticles: "No articles yet",
       title: "Knowledge base",
       subtitle: "Internal wiki and employee portal",
       writeArticle: "Write article",

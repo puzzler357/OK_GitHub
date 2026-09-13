@@ -1,34 +1,65 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CheckSquare, Square, UserPlus, UserMinus, ArrowRight, X } from 'lucide-react';
+import { useDatabaseStore, TABLES } from '../store/useDatabaseStore';
+import type { ChecklistTask } from '../store/useDatabaseStore';
+
+type Kind = 'onboarding' | 'offboarding';
 
 export default function Onboarding() {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState('onboarding');
+  const { checklistTasks, employees, updateIn } = useDatabaseStore();
 
-  const [onboarding, setOnboarding] = useState([
-    { id: 1, title: 'Подготовка рабочего места', done: true, assignee: 'IT Отдел' },
-    { id: 2, title: 'Создание учетных записей (Email, Slack, Jira)', done: true, assignee: 'IT Отдел' },
-    { id: 3, title: 'Ознакомление с политиками компании', done: false, assignee: 'HR' },
-    { id: 4, title: 'Встреча с руководителем (Welcome Meeting)', done: false, assignee: 'Руководитель' },
-    { id: 5, title: 'Выдача пропуска', done: false, assignee: 'Офис-менеджер' },
-  ]);
+  const [activeTab, setActiveTab] = useState<Kind>('onboarding');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [commentDraft, setCommentDraft] = useState('');
 
-  const [offboarding, setOffboarding] = useState([
-    { id: 1, title: 'Блокировка доступов к системам', done: false, assignee: 'IT Отдел' },
-    { id: 2, title: 'Сдача техники', done: false, assignee: 'IT Отдел' },
-    { id: 3, title: 'Exit Interview', done: false, assignee: 'HR' },
-    { id: 4, title: 'Подписание обходного листа', done: false, assignee: 'Сотрудник' },
-  ]);
+  const tasksOfKind = useMemo(
+    () => checklistTasks.filter(task => task.kind === activeTab),
+    [checklistTasks, activeTab],
+  );
 
-  const [selectedTask, setSelectedTask] = useState<{id: number, title: string, assignee: string, type: string} | null>(null);
+  // Сотрудники, у которых есть чек-лист этого типа. Счётчики на вкладках
+  // считаются отсюда же — раньше там стояли константы 2 и 1.
+  const employeeIds = useMemo(
+    () => Array.from(new Set(tasksOfKind.map(task => task.employeeId))),
+    [tasksOfKind],
+  );
 
-  const toggleTask = (id: number, type: 'onboarding' | 'offboarding') => {
-    if (type === 'onboarding') {
-      setOnboarding(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
-    } else {
-      setOffboarding(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  const countActive = (kind: Kind) => {
+    const tasks = checklistTasks.filter(task => task.kind === kind && !task.done);
+    return new Set(tasks.map(task => task.employeeId)).size;
+  };
+
+  // Как только меняется вкладка, выбранный сотрудник может исчезнуть из списка.
+  useEffect(() => {
+    if (!employeeIds.includes(selectedEmployeeId)) {
+      setSelectedEmployeeId(employeeIds[0] ?? '');
     }
+  }, [employeeIds, selectedEmployeeId]);
+
+  const tasks = tasksOfKind.filter(task => task.employeeId === selectedEmployeeId);
+  const selectedTask = selectedTaskId ? tasks.find(task => task.id === selectedTaskId) ?? null : null;
+
+  const employeeName = (id: string) => employees.find(e => e.id === id)?.fullName ?? '—';
+
+  const completed = tasks.filter(task => task.done).length;
+  const progress = tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0;
+
+  const toggleTask = (task: ChecklistTask) => {
+    void updateIn(TABLES.checklistTasks, task.id, { done: !task.done });
+  };
+
+  const openTask = (task: ChecklistTask) => {
+    setSelectedTaskId(task.id);
+    setCommentDraft(task.comment ?? '');
+  };
+
+  const saveComment = () => {
+    if (!selectedTask) return;
+    void updateIn(TABLES.checklistTasks, selectedTask.id, { comment: commentDraft });
+    setSelectedTaskId(null);
   };
 
   return (
@@ -38,7 +69,7 @@ export default function Onboarding() {
           <div className="bg-surface border border-line rounded-2xl w-full max-w-md overflow-hidden">
             <div className="flex justify-between items-center p-6 border-b border-line">
               <h3 className="text-xl font-bold text-primary">{t('onboarding.taskDetails')}</h3>
-              <button onClick={() => setSelectedTask(null)} className="text-muted hover:text-primary transition-colors">
+              <button onClick={() => setSelectedTaskId(null)} className="text-muted hover:text-primary transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -49,36 +80,40 @@ export default function Onboarding() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">{t('onboarding.responsible')}</label>
-                <p className="text-primary">{selectedTask.assignee}</p>
+                <p className="text-primary">{selectedTask.assignee || '—'}</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">{t('employees.col.status')}</label>
-                <p className="text-primary">
-                  {((selectedTask.type === 'onboarding' ? onboarding : offboarding).find(t => t.id === selectedTask.id)?.done) ? t('onboarding.done') : t('onboarding.inProgress')}
-                </p>
+                <p className="text-primary">{selectedTask.done ? t('onboarding.done') : t('onboarding.inProgress')}</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">{t('onboarding.comment')}</label>
                 <textarea
+                  value={commentDraft}
+                  onChange={(e) => setCommentDraft(e.target.value)}
                   className="w-full bg-app border border-line rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 text-primary resize-none h-24"
                   placeholder={t('onboarding.commentPh')}
-                ></textarea>
+                />
               </div>
-              <div className="pt-2">
-                <button 
-                  onClick={() => {
-                    toggleTask(selectedTask.id, selectedTask.type as any);
-                    setSelectedTask(null);
-                  }}
+              <div className="pt-2 space-y-3">
+                <button
+                  onClick={saveComment}
+                  className="w-full bg-surface-3 hover:bg-surface-hover text-primary px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                >
+                  {t('onboarding.saveComment')}
+                </button>
+                <button
+                  onClick={() => { toggleTask(selectedTask); setSelectedTaskId(null); }}
                   className="w-full bg-accent-500 hover:bg-accent-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
                 >
-                  {((selectedTask.type === 'onboarding' ? onboarding : offboarding).find(task => task.id === selectedTask.id)?.done) ? t('onboarding.markUndone') : t('onboarding.markDone')}
+                  {selectedTask.done ? t('onboarding.markUndone') : t('onboarding.markDone')}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-primary">{t('onboarding.title')}</h2>
@@ -87,7 +122,7 @@ export default function Onboarding() {
       </div>
 
       <div className="flex gap-4 mb-6">
-        <button 
+        <button
           onClick={() => setActiveTab('onboarding')}
           className={`flex-1 p-6 rounded-2xl border transition-colors flex items-center gap-4 ${activeTab === 'onboarding' ? 'bg-accent-500/10 border-accent-500/50' : 'bg-surface border-line hover:bg-surface-hover'}`}
         >
@@ -96,11 +131,11 @@ export default function Onboarding() {
           </div>
           <div className="text-left">
             <h3 className={`font-semibold text-lg ${activeTab === 'onboarding' ? 'text-accent-400' : 'text-primary'}`}>Onboarding</h3>
-            <p className="text-sm text-muted">{t('onboarding.active', { count: 2 })}</p>
+            <p className="text-sm text-muted">{t('onboarding.active', { count: countActive('onboarding') })}</p>
           </div>
         </button>
 
-        <button 
+        <button
           onClick={() => setActiveTab('offboarding')}
           className={`flex-1 p-6 rounded-2xl border transition-colors flex items-center gap-4 ${activeTab === 'offboarding' ? 'bg-accent-500/10 border-accent-500/50' : 'bg-surface border-line hover:bg-surface-hover'}`}
         >
@@ -109,39 +144,52 @@ export default function Onboarding() {
           </div>
           <div className="text-left">
             <h3 className={`font-semibold text-lg ${activeTab === 'offboarding' ? 'text-accent-400' : 'text-primary'}`}>Offboarding</h3>
-            <p className="text-sm text-muted">{t('onboarding.active', { count: 1 })}</p>
+            <p className="text-sm text-muted">{t('onboarding.active', { count: countActive('offboarding') })}</p>
           </div>
         </button>
       </div>
 
       <div className="bg-surface border border-line rounded-2xl p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-medium text-primary">
-            {activeTab === 'onboarding' ? `${t('onboarding.newEmployee')}: Иванов Иван` : `${t('onboarding.leaving')}: Петров Петр`}
-          </h3>
-          {(() => {
-            const currentTasks = activeTab === 'onboarding' ? onboarding : offboarding;
-            const completed = currentTasks.filter(task => task.done).length;
-            const progress = Math.round((completed / currentTasks.length) * 100);
-            return <span className="text-sm text-muted">{t('onboarding.progress')}: {progress}%</span>;
-          })()}
+        <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted">
+              {activeTab === 'onboarding' ? t('onboarding.newEmployee') : t('onboarding.leaving')}:
+            </span>
+            <select
+              value={selectedEmployeeId}
+              onChange={(e) => setSelectedEmployeeId(e.target.value)}
+              className="bg-app border border-line rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 text-primary"
+            >
+              {employeeIds.length === 0 && <option value="">—</option>}
+              {employeeIds.map(id => (
+                <option key={id} value={id}>{employeeName(id)}</option>
+              ))}
+            </select>
+          </div>
+          <span className="text-sm text-muted">{t('onboarding.progress')}: {progress}%</span>
         </div>
 
         <div className="space-y-3">
-          {(activeTab === 'onboarding' ? onboarding : offboarding).map(task => (
+          {tasks.map(task => (
             <div key={task.id} className="flex items-center gap-4 p-4 rounded-xl border border-line bg-surface-2 hover:bg-surface-hover transition-colors">
-              <button onClick={() => toggleTask(task.id, activeTab as 'onboarding' | 'offboarding')} className={`${task.done ? 'text-accent-500' : 'text-muted hover:text-accent-400'} transition-colors`}>
+              <button onClick={() => toggleTask(task)} className={`${task.done ? 'text-accent-500' : 'text-muted hover:text-accent-400'} transition-colors`}>
                 {task.done ? <CheckSquare className="w-6 h-6" /> : <Square className="w-6 h-6" />}
               </button>
               <div className="flex-1">
                 <p className={`font-medium ${task.done ? 'text-muted line-through' : 'text-primary'}`}>{task.title}</p>
-                <p className="text-xs text-muted mt-1">{t('onboarding.responsible')}: {task.assignee}</p>
+                <p className="text-xs text-muted mt-1">{t('onboarding.responsible')}: {task.assignee || '—'}</p>
               </div>
-              <button onClick={() => setSelectedTask({ ...task, type: activeTab })} className="p-2 text-muted hover:text-primary transition-colors cursor-pointer">
+              <button onClick={() => openTask(task)} className="p-2 text-muted hover:text-primary transition-colors cursor-pointer">
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           ))}
+
+          {tasks.length === 0 && (
+            <div className="p-8 text-center text-muted border border-dashed border-line rounded-xl">
+              {t('onboarding.noTasks')}
+            </div>
+          )}
         </div>
       </div>
     </div>

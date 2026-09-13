@@ -1,41 +1,82 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Calendar as CalendarIcon, Clock, CheckCircle2, XCircle, Clock3, X } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { useDatabaseStore, TABLES } from '../store/useDatabaseStore';
+import type { TimeOffRequest } from '../store/useDatabaseStore';
 
-const initialRequests = [
-  { id: '1', type: 'vacation', dates: '15.08.2024 - 28.08.2024', days: 14, status: 'approved', employee: 'Сидоров Сидор' },
-  { id: '2', type: 'sick', dates: '01.07.2024 - 05.07.2024', days: 5, status: 'pending', employee: 'Иванов Иван' },
-  { id: '3', type: 'dayoff', dates: '10.06.2024', days: 1, status: 'rejected', employee: 'Смирнова Анна' },
-];
+const today = () => new Date().toISOString().split('T')[0];
+
+/** Календарных дней в интервале, включая обе границы. */
+function daysBetween(from: string, to: string): number {
+  const start = new Date(from);
+  const end = new Date(to);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
+  return Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+}
+
+// Годовая норма отпуска. Вынесена константой, пока нет настройки в «Общих».
+const ANNUAL_VACATION_DAYS = 24;
 
 export default function TimeOff() {
   const { t } = useTranslation();
   const { user } = useAppStore();
+  const { timeOffRequests, employees, createIn, updateIn } = useDatabaseStore();
+
   const [activeTab, setActiveTab] = useState('my');
-  const [requests, setRequests] = useState(initialRequests);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newRequest, setNewRequest] = useState({ type: 'vacation', dates: '', days: 1 });
+  const [newRequest, setNewRequest] = useState({
+    employeeId: '',
+    type: 'vacation',
+    dateFrom: today(),
+    dateTo: today(),
+  });
 
-  const handleAddRequest = (e: React.FormEvent) => {
+  const employeeName = (id: string) => employees.find(e => e.id === id)?.fullName ?? '—';
+
+  // «Мои заявки» — заявки сотрудника, чьё имя совпадает с владельцем устройства.
+  // Раньше здесь стояло условие с проверкой на конкретный идентификатор '1'.
+  const ownEmployeeId = useMemo(
+    () => employees.find(e => e.fullName === user?.name)?.id,
+    [employees, user?.name],
+  );
+
+  const visibleRequests = activeTab === 'my'
+    ? timeOffRequests.filter(r => r.employeeId === ownEmployeeId)
+    : timeOffRequests;
+
+  // Плитки считаются по данным: раньше здесь стояли константы 24 и 1.
+  const currentYear = new Date().getFullYear();
+  const usedVacationDays = timeOffRequests
+    .filter(r => r.type === 'vacation' && r.status === 'approved'
+      && new Date(r.dateFrom).getFullYear() === currentYear
+      && (!ownEmployeeId || r.employeeId === ownEmployeeId))
+    .reduce((sum, r) => sum + r.days, 0);
+  const availableDays = Math.max(0, ANNUAL_VACATION_DAYS - usedVacationDays);
+  const pendingCount = timeOffRequests.filter(r => r.status === 'pending').length;
+
+  const requestedDays = daysBetween(newRequest.dateFrom, newRequest.dateTo);
+
+  const handleAddRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRequest.dates) return;
+    if (!newRequest.employeeId || requestedDays <= 0) return;
 
-    setRequests(prev => [...prev, {
-      id: Math.random().toString(36).substr(2, 9),
+    await createIn<TimeOffRequest>(TABLES.timeOff, {
+      employeeId: newRequest.employeeId,
       type: newRequest.type,
-      dates: newRequest.dates,
-      days: newRequest.days,
+      dateFrom: newRequest.dateFrom,
+      dateTo: newRequest.dateTo,
+      // Количество дней считается по интервалу, а не вводится руками.
+      days: requestedDays,
       status: 'pending',
-      employee: user?.name || t('user.owner')
-    }]);
+    });
 
-    setNewRequest({ type: 'vacation', dates: '', days: 1 });
+    setNewRequest({ employeeId: '', type: 'vacation', dateFrom: today(), dateTo: today() });
     setIsModalOpen(false);
   };
-  
+
   const handleAction = (id: string, status: string) => {
-    setRequests(prev => prev.map(req => req.id === id ? { ...req, status } : req));
+    void updateIn(TABLES.timeOff, id, { status });
   };
 
   return (
@@ -51,6 +92,20 @@ export default function TimeOff() {
             </div>
             <form onSubmit={handleAddRequest} className="p-6 space-y-4">
               <div>
+                <label className="block text-sm font-medium text-secondary mb-2">{t('timeoff.employee')} *</label>
+                <select
+                  required
+                  value={newRequest.employeeId}
+                  onChange={(e) => setNewRequest({ ...newRequest, employeeId: e.target.value })}
+                  className="w-full bg-app border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 text-primary"
+                >
+                  <option value="">—</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>{emp.fullName}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-secondary mb-2">{t('timeoff.type')} *</label>
                 <select
                   value={newRequest.type}
@@ -63,28 +118,32 @@ export default function TimeOff() {
                   <option value="remote">{t('timeoff.types.remote')}</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-2">{t('timeoff.dates')} *</label>
-                <input
-                  type="text"
-                  required
-                  value={newRequest.dates}
-                  onChange={(e) => setNewRequest({ ...newRequest, dates: e.target.value })}
-                  className="w-full bg-app border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 text-primary"
-                  placeholder={t('timeoff.datesPh')}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-secondary mb-2">{t('timeoff.dateFrom')} *</label>
+                  <input
+                    type="date"
+                    required
+                    value={newRequest.dateFrom}
+                    onChange={(e) => setNewRequest({ ...newRequest, dateFrom: e.target.value })}
+                    className="w-full bg-app border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 text-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-secondary mb-2">{t('timeoff.dateTo')} *</label>
+                  <input
+                    type="date"
+                    required
+                    min={newRequest.dateFrom}
+                    value={newRequest.dateTo}
+                    onChange={(e) => setNewRequest({ ...newRequest, dateTo: e.target.value })}
+                    className="w-full bg-app border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 text-primary"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-2">{t('timeoff.daysCount')} *</label>
-                <input 
-                  type="number" 
-                  min="1"
-                  required
-                  value={newRequest.days}
-                  onChange={(e) => setNewRequest({ ...newRequest, days: parseInt(e.target.value) })}
-                  className="w-full bg-app border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 text-primary"
-                />
-              </div>
+              <p className="text-sm text-muted">
+                {t('timeoff.daysCount')}: <span className="text-primary font-medium">{requestedDays}</span>
+              </p>
               <div className="pt-4 flex gap-3">
                 <button 
                   type="button" 
@@ -123,7 +182,7 @@ export default function TimeOff() {
             </div>
             <h3 className="font-medium text-primary">{t('timeoff.availableDays')}</h3>
           </div>
-          <p className="text-3xl font-bold text-primary mt-4">24 <span className="text-base font-normal text-muted">{t('timeoff.daysUnit')}</span></p>
+          <p className="text-3xl font-bold text-primary mt-4">{availableDays} <span className="text-base font-normal text-muted">{t('timeoff.daysUnit')}</span></p>
         </div>
         <div className="bg-surface border border-line rounded-2xl p-6">
           <div className="flex items-center gap-4 mb-2">
@@ -132,7 +191,7 @@ export default function TimeOff() {
             </div>
             <h3 className="font-medium text-primary">{t('timeoff.pendingApproval')}</h3>
           </div>
-          <p className="text-3xl font-bold text-primary mt-4">1 <span className="text-base font-normal text-muted">{t('timeoff.requestUnit')}</span></p>
+          <p className="text-3xl font-bold text-primary mt-4">{pendingCount} <span className="text-base font-normal text-muted">{t('timeoff.requestUnit')}</span></p>
         </div>
       </div>
 
@@ -165,12 +224,12 @@ export default function TimeOff() {
               </tr>
             </thead>
             <tbody>
-              {(activeTab === 'my' ? requests.filter(r => r.employee === user?.name || r.id === '1') : requests).map(req => (
+              {visibleRequests.map(req => (
                 <tr key={req.id} className="border-b border-line hover:bg-surface-hover">
                   <td className="p-table text-table font-medium text-primary">{t(`timeoff.types.${req.type}`)}</td>
-                  <td className="p-table text-table text-muted">{req.dates}</td>
+                  <td className="p-table text-table text-muted">{req.dateFrom} — {req.dateTo}</td>
                   <td className="p-table text-table text-muted">{req.days}</td>
-                  {activeTab === 'team' && <td className="p-table text-table text-secondary">{req.employee}</td>}
+                  {activeTab === 'team' && <td className="p-table text-table text-secondary">{employeeName(req.employeeId)}</td>}
                   <td className="p-table text-table">
                     <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
                       req.status === 'approved' ? 'bg-emerald-500/10 text-emerald-400' :
@@ -199,6 +258,13 @@ export default function TimeOff() {
                   )}
                 </tr>
               ))}
+              {visibleRequests.length === 0 && (
+                <tr>
+                  <td colSpan={activeTab === 'team' ? 6 : 4} className="p-table text-table text-center text-muted py-8">
+                    {t('timeoff.noRequests')}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
