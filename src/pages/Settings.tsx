@@ -4,6 +4,7 @@ import { useAppStore } from '../store/useAppStore';
 import { useDatabaseStore, TABLES } from '../store/useDatabaseStore';
 import type { AuditEntry, BackupEntry } from '../store/useDatabaseStore';
 import { exportToExcel } from '../lib/excel';
+import ImportWizard from '../components/ImportWizard';
 import { useMoney } from '../lib/money';
 import type { CurrencyDecimals, CurrencyPosition, ThousandsSeparator } from '../lib/money';
 import * as api from '../data';
@@ -742,28 +743,7 @@ export default function Settings() {
                 <p className="text-sm text-muted">{t('settings.io.subtitle')}</p>
               </div>
 
-              <div>
-                <div className="bg-surface-2 border border-line rounded-2xl p-6 md:p-8">
-                  <h4 className="font-medium text-lg mb-6">{t('settings.io.wizard')}</h4>
-                  <div className="flex gap-6 mb-8 border-b border-line overflow-x-auto">
-                    <div className="pb-3 border-b-2 border-accent-500 text-accent-400 text-sm font-medium whitespace-nowrap">{t('settings.io.step1')}</div>
-                    <div className="pb-3 text-muted text-sm font-medium whitespace-nowrap">{t('settings.io.step2')}</div>
-                    <div className="pb-3 text-muted text-sm font-medium whitespace-nowrap">{t('settings.io.step3')}</div>
-                    <div className="pb-3 text-muted text-sm font-medium whitespace-nowrap">{t('settings.io.step4')}</div>
-                  </div>
-
-                  <div className="border-2 border-dashed border-line rounded-2xl p-12 flex flex-col items-center justify-center text-center bg-input">
-                    <div className="w-12 h-12 bg-surface rounded-xl flex items-center justify-center mb-4">
-                      <Download className="w-6 h-6 text-muted" />
-                    </div>
-                    <p className="text-secondary font-medium mb-2">{t('settings.io.drop')}</p>
-                    <p className="text-muted text-sm mb-6">{t('settings.io.formats')}</p>
-                    <button className="bg-accent-500 hover:bg-accent-600 text-white px-6 py-2.5 rounded-xl text-sm font-medium transition-colors">
-                      {t('settings.io.choose')}
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <ImportWizard />
             </div>
           )}
 
