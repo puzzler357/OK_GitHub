@@ -22,7 +22,7 @@ import { useAppStore } from '../store/useAppStore';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
-  const { theme, language, setTheme, setLanguage, sidebarOpen, toggleSidebar } = useAppStore();
+  const { theme, language, setTheme, setLanguage, sidebarOpen, toggleSidebar, user } = useAppStore();
 
   useEffect(() => {
     // Initial theme apply
@@ -35,7 +35,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [theme]);
 
-    const { user } = useAppStore();
 
   // Однопользовательское приложение: все разделы доступны владельцу устройства.
   const navItems = [
@@ -106,11 +105,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="p-4 mt-auto">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-accent-900 flex items-center justify-center text-accent-300 font-semibold flex-shrink-0">
-              {useAppStore.getState().user?.name?.[0] || 'A'}
+              {user?.name?.[0] || 'A'}
             </div>
             {sidebarOpen && (
               <div className="overflow-hidden">
-                <p className="font-medium text-sm text-primary truncate">{useAppStore.getState().user?.name || 'HRDesk'}</p>
+                <p className="font-medium text-sm text-primary truncate">{user?.name || 'HRDesk'}</p>
                 <p className="text-xs text-muted truncate">{t('user.owner')}</p>
               </div>
             )}

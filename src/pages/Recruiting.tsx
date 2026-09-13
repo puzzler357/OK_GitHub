@@ -272,7 +272,7 @@ export default function Recruiting() {
                     <div 
                       ref={provided.innerRef} 
                       {...provided.droppableProps}
-                      className={`flex-1 overflow-y-auto space-y-3 pr-2 transition-colors rounded-xl \${snapshot.isDraggingOver ? 'bg-surface-2' : ''}`}
+                      className={`flex-1 overflow-y-auto space-y-3 pr-2 transition-colors rounded-xl ${snapshot.isDraggingOver ? 'bg-surface-2' : ''}`}
                     >
                       {columnCandidates.map((candidate, index) => (
                         <Draggable key={candidate.id} draggableId={candidate.id} index={index}>
@@ -281,7 +281,7 @@ export default function Recruiting() {
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
-                              className={`bg-surface-3 border border-line rounded-xl p-4 cursor-grab hover:border-accent-500/50 transition-colors \${snapshot.isDragging ? 'shadow-xl shadow-black/50 ring-2 ring-accent-500 rotate-2' : ''}`}
+                              className={`bg-surface-3 border border-line rounded-xl p-4 cursor-grab hover:border-accent-500/50 transition-colors ${snapshot.isDragging ? 'shadow-xl shadow-black/50 ring-2 ring-accent-500 rotate-2' : ''}`}
                             >
                               <div className="flex justify-between items-start mb-2">
                                 <h4 className="font-medium text-primary">{candidate.name}</h4>
