@@ -543,7 +543,7 @@ export default function Reports() {
 
       <div className="flex flex-1 gap-6 min-h-0 overflow-hidden">
         {activeTab === 'catalog' && (
-          <div className="w-1/3 flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar">
+          <div className="w-72 flex-shrink-0 flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar">
             <h3 className="font-semibold text-lg mb-2">{t('reports.catalog')}</h3>
             {reports.map(report => (
               <button

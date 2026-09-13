@@ -261,7 +261,7 @@ export default function OrgChart() {
       {/* Modals */}
       {isDepModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-2xl w-full max-w-md p-6">
+          <div className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-2xl w-full max-w-md p-6 max-h-[85vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold">{editingDep ? t('orgchart.editDep') : t('orgchart.newDepartment')}</h3>
               <button onClick={() => setIsDepModalOpen(false)} className="text-muted hover:text-secondary">
@@ -291,7 +291,7 @@ export default function OrgChart() {
 
       {isPosModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-2xl w-full max-w-md p-6">
+          <div className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-2xl w-full max-w-md p-6 max-h-[85vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold">{editingPos ? t('orgchart.editPos') : t('orgchart.newPosition')}</h3>
               <button onClick={() => setIsPosModalOpen(false)} className="text-muted hover:text-secondary">

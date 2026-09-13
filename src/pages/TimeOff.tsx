@@ -83,14 +83,14 @@ export default function TimeOff() {
     <div className="space-y-6">
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-surface border border-line rounded-2xl w-full max-w-md overflow-hidden">
+          <div className="bg-surface border border-line rounded-2xl w-full max-w-md overflow-hidden max-h-[85vh] flex flex-col">
             <div className="flex justify-between items-center p-6 border-b border-line">
               <h3 className="text-xl font-bold text-primary">{t('timeoff.requestTitle')}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-muted hover:text-primary transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleAddRequest} className="p-6 space-y-4">
+            <form onSubmit={handleAddRequest} className="p-6 space-y-4 overflow-y-auto">
               <div>
                 <label className="block text-sm font-medium text-secondary mb-2">{t('timeoff.employee')} *</label>
                 <select

@@ -28,13 +28,14 @@ import KnowledgeBase from './pages/KnowledgeBase';
 import Archive from './pages/Archive';
 
 import LockScreen from './components/LockScreen';
+import { ErrorState } from './components/States';
 import { useIdleLock } from './lib/useIdleLock';
 import { useAppStore } from './store/useAppStore';
 import { useDatabaseStore } from './store/useDatabaseStore';
 
 export default function App() {
   const { user, startScreen, locked } = useAppStore();
-  const { fetchAll } = useDatabaseStore();
+  const { fetchAll, error } = useDatabaseStore();
 
   useIdleLock();
 
@@ -52,6 +53,16 @@ export default function App() {
   // на экране, пока владелец отошёл.
   if (locked) {
     return <LockScreen />;
+  }
+
+  // Ошибка загрузки перекрывает приложение: показывать пустые экраны и
+  // молчать о причине — худший из вариантов.
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+        <ErrorState message={error} onRetry={() => { void fetchAll(); }} />
+      </div>
+    );
   }
 
   return (

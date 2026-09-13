@@ -34,6 +34,11 @@ export const en = {
       passwordMismatch: "Passwords do not match",
       create: "Create and sign in"
     },
+    states: {
+      loadFailed: "Failed to load data",
+      retry: "Retry",
+      loading: "Loading data"
+    },
     common: {
       search: "Search...",
       loading: "Loading...",

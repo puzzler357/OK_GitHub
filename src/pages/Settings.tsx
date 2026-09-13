@@ -211,7 +211,7 @@ export default function Settings() {
       <div className="flex flex-1 min-h-0 bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-2xl shadow-sm overflow-hidden">
         
         {/* Left Sidebar for Settings Tabs */}
-        <div className="w-64 border-r border-[var(--border-color)] p-4 flex flex-col gap-1 overflow-y-auto">
+        <div className="w-56 flex-shrink-0 border-r border-[var(--border-color)] p-4 flex flex-col gap-1 overflow-y-auto">
           {tabs.map(tab => (
             <button
               key={tab.id}

@@ -90,14 +90,14 @@ export default function Performance() {
     <div className="space-y-6">
       {isAddGoalModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-surface border border-line rounded-2xl w-full max-w-md overflow-hidden">
+          <div className="bg-surface border border-line rounded-2xl w-full max-w-md overflow-hidden max-h-[85vh] flex flex-col">
             <div className="flex justify-between items-center p-6 border-b border-line">
               <h3 className="text-xl font-bold text-primary">{t('performance.addGoal')}</h3>
               <button onClick={() => setIsAddGoalModalOpen(false)} className="text-muted hover:text-primary transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleAddGoal} className="p-6 space-y-4">
+            <form onSubmit={handleAddGoal} className="p-6 space-y-4 overflow-y-auto">
               <div>
                 <label className="block text-sm font-medium text-secondary mb-2">{t('performance.goalDesc')} *</label>
                 <input
@@ -162,14 +162,14 @@ export default function Performance() {
 
       {isLaunchReviewModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-surface border border-line rounded-2xl w-full max-w-md overflow-hidden">
+          <div className="bg-surface border border-line rounded-2xl w-full max-w-md overflow-hidden max-h-[85vh] flex flex-col">
             <div className="flex justify-between items-center p-6 border-b border-line">
               <h3 className="text-xl font-bold text-primary">{t('performance.launchReview')}</h3>
               <button onClick={() => setIsLaunchReviewModalOpen(false)} className="text-muted hover:text-primary transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto">
               <div>
                 <label className="block text-sm font-medium text-secondary mb-2">{t('performance.reviewPeriod')}</label>
                 <input
@@ -219,14 +219,14 @@ export default function Performance() {
 
       {isReviewModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-surface border border-line rounded-2xl w-full max-w-md overflow-hidden">
+          <div className="bg-surface border border-line rounded-2xl w-full max-w-md overflow-hidden max-h-[85vh] flex flex-col">
             <div className="flex justify-between items-center p-6 border-b border-line">
               <h3 className="text-xl font-bold text-primary">{t('performance.reviewTitle')}</h3>
               <button onClick={() => setIsReviewModalOpen(false)} className="text-muted hover:text-primary transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto">
               <div>
                 <label className="block text-sm font-medium text-secondary mb-2">
                   {t('performance.colleague')}: {employeeName(newReview.employeeId)}

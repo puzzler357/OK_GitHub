@@ -16,6 +16,7 @@ import { ChevronDown, ChevronUp, Upload } from 'lucide-react';
 import EmployeeForm from '../components/EmployeeForm';
 import EmployeeActions from '../components/EmployeeActions';
 import { exportToExcel, parseExcel } from '../lib/excel';
+import { TableSkeleton } from '../components/States';
 import { useMoney } from '../lib/money';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
 import { useDatabaseStore } from '../store/useDatabaseStore';
@@ -39,7 +40,7 @@ const rateFilterFn: FilterFn<Employee> = (row, columnId, value) => {
 
 export default function Employees() {
   const { t } = useTranslation();
-  const { employees: data, departments, addEmployee, importEmployees } = useDatabaseStore();
+  const { employees: data, departments, addEmployee, importEmployees, loading } = useDatabaseStore();
   const money = useMoney();
   const notify = useNotify();
 
@@ -350,7 +351,9 @@ export default function Employees() {
               {paddingBottom > 0 && <tr style={{ height: paddingBottom }} aria-hidden />}
             </tbody>
           </table>
-          {tableRows.length === 0 && (
+          {loading && data.length === 0 && <TableSkeleton rows={8} columns={6} />}
+
+          {!loading && tableRows.length === 0 && (
             <div className="p-12 text-center text-muted">
               {t('employees.empty')}
             </div>

@@ -34,6 +34,11 @@ export const tk = {
       passwordMismatch: "Parollar gabat gelmeýär",
       create: "Döret we gir"
     },
+    states: {
+      loadFailed: "Maglumatlary ýükläp bolmady",
+      retry: "Gaýtalamak",
+      loading: "Maglumatlar ýüklenýär"
+    },
     common: {
       search: "Gözleg...",
       loading: "Ýüklenýär...",

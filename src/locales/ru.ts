@@ -34,6 +34,11 @@ export const ru = {
       passwordMismatch: "Пароли не совпадают",
       create: "Создать и войти"
     },
+    states: {
+      loadFailed: "Не удалось загрузить данные",
+      retry: "Повторить",
+      loading: "Загрузка данных"
+    },
     common: {
       search: "Поиск...",
       loading: "Загрузка...",

@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useDatabaseStore } from '../store/useDatabaseStore';
 import { useMoney } from '../lib/money';
 import { payrollTotal } from '../lib/payroll';
+import { CardsSkeleton } from '../components/States';
 import { clickable } from '../lib/a11y';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#3b82f6', '#ec4899'];
@@ -18,7 +19,8 @@ const recentEvents = [
 export default function Dashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { employees } = useDatabaseStore();
+  const { employees, loading } = useDatabaseStore();
+  const templateCount = useDatabaseStore(s => s.templates.length);
   const money = useMoney();
 
   const birthdaysToday = useMemo(() => {
@@ -45,6 +47,16 @@ export default function Dashboard() {
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [employees]);
+
+  // Пока справочники не пришли, показываем скелет: пустые плитки с нулями
+  // выглядят как ответ, хотя ответа ещё нет.
+  if (loading && employees.length === 0) {
+    return (
+      <div className="space-y-6">
+        <CardsSkeleton count={4} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -81,7 +93,7 @@ export default function Dashboard() {
             <h3 className="text-sm font-medium text-muted">{t('nav.templates')}</h3>
             <FileText className="w-5 h-5 text-emerald-500" />
           </div>
-          <p className="text-3xl font-semibold tabular-nums text-primary dark:text-primary">{useDatabaseStore(s => s.templates.length)}</p>
+          <p className="text-3xl font-semibold tabular-nums text-primary dark:text-primary">{templateCount}</p>
           <p className="text-sm text-muted mt-2">{t('dashboard.activeTemplates')}</p>
         </div>
 

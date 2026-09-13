@@ -91,6 +91,10 @@ interface EntityActions {
 }
 
 interface FetchActions {
+  /** Идёт первичная загрузка справочников. */
+  loading: boolean;
+  /** Текст ошибки загрузки. null — ошибки нет. */
+  error: string | null;
   fetchAll: () => Promise<void>;
   fetchTimesheets: (year: number, month: number) => Promise<void>;
   fetchArchives: (filters: ArchiveFilters) => Promise<void>;
@@ -119,10 +123,14 @@ export const useDatabaseStore = create<DatabaseState & FetchActions & EntityActi
     reportPresets: [],
     backups: [],
 
+    loading: false,
+    error: null,
+
     // Справочники грузятся целиком — их размер ограничен штатом и структурой.
     // Табель и архив сюда не входят: они растут линейно по времени, и их
     // запрашивают срезом экраны, которым они нужны.
     fetchAll: async () => {
+      set({ loading: true, error: null });
       try {
         const [employees, templates, departments, positions, ...entityRows] = await Promise.all([
           api.listEmployees(),
@@ -135,9 +143,12 @@ export const useDatabaseStore = create<DatabaseState & FetchActions & EntityActi
         const entityState: Record<string, unknown> = {};
         ENTITIES.forEach((e, i) => { entityState[e.stateKey] = entityRows[i]; });
 
-        set({ employees, templates, departments, positions, ...entityState } as any);
+        set({ employees, templates, departments, positions, ...entityState, loading: false } as any);
       } catch (e) {
+        // Раньше ошибка молча уходила в консоль, и пользователь видел пустые
+        // экраны без объяснения, почему они пустые.
         console.error('Failed to fetch initial data', e);
+        set({ loading: false, error: e instanceof Error ? e.message : String(e) });
       }
     },
 
