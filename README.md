@@ -9,7 +9,7 @@
 | Слой | Технологии |
 |---|---|
 | Фронтенд | React 19, Vite 6, TypeScript, Tailwind CSS 4, React Router 7 |
-| Состояние и данные | TanStack Query, Zustand-стор (`src/store`), React Hook Form + Zod |
+| Состояние и данные | Zustand-стор (`src/store`), TanStack Table, React Hook Form + Zod |
 | Настольное приложение | Tauri 2 (`@tauri-apps/plugin-sql` → SQLite) |
 | Веб-режим | Express 4 + better-sqlite3, JWT, bcryptjs |
 | Документы | docxtemplater + PizZip (DOCX), ExcelJS (XLSX), html2pdf.js (PDF) |
@@ -49,8 +49,10 @@ admin@global.tech / password123
 > Это сид для разработки, заданный в [src/db/sqlite.ts](src/db/sqlite.ts). Смените пароль
 > сразу после первого входа — в приложении есть форма смены пароля и сброс системы.
 
-Переменные окружения — см. [.env.example](.env.example); локальные значения кладите в `.env.local`
-(файлы `.env*` не попадают в git).
+Переменные окружения необязательны — см. [.env.example](.env.example). Локальные значения
+кладите в `.env.local`, он читается на старте сервера и приоритетнее `.env`; файлы `.env*`
+в git не попадают. Настраиваются секрет JWT (`JWT_SECRET`), порт (`PORT`) и путь к базе
+(`DB_PATH`).
 
 ## Структура проекта
 
