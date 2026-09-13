@@ -1,0 +1,21 @@
+# Единые окончания строк в репозитории: в git всегда LF,
+# в рабочей копии — тоже LF, независимо от ОС разработчика.
+# Нужно, чтобы сборка на Linux/CI видела те же файлы, что и на Windows.
+* text=auto eol=lf
+
+# Бинарные файлы git не должен нормализовать
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.ico   binary
+*.icns  binary
+*.woff  binary
+*.woff2 binary
+*.zip   binary
+*.db    binary
+*.docx  binary
+*.xlsx  binary
+
+# Lock-файлы: генерируются инструментами, в diff шумят
+package-lock.json  linguist-generated=true -diff
+src-tauri/Cargo.lock linguist-generated=true -diff
