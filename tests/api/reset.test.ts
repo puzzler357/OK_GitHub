@@ -1,5 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
 import { api, startApi, stopApi } from './helpers';
+import { ENTITIES } from '../../src/data/entities';
 
 // ВАЖНО: этот файл чистит базу и не восстанавливает её — посев выполняется
 // один раз за жизнь файла БД, вернуть демо-данные после сброса нельзя.
@@ -39,7 +40,12 @@ describe('POST /api/auth/reset-system', () => {
       department: 'IT', position: 'Инженер', salary: 1000, hoursWorked: 160,
     });
 
-    const routes = ['/api/employees', '/api/departments', '/api/positions', '/api/templates', '/api/timesheets', '/api/archives'];
+    // Таблицы экранов подбора, отпусков и прочих тоже должны очищаться —
+    // они наполняются посевом и попадают в RESETTABLE_TABLES.
+    const routes = [
+      '/api/employees', '/api/departments', '/api/positions', '/api/templates', '/api/timesheets', '/api/archives',
+      ...ENTITIES.map((e) => `/api/${e.route}`),
+    ];
     for (const route of routes) {
       expect((await api('GET', route)).body.length).toBeGreaterThan(0);
     }

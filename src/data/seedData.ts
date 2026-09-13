@@ -1,0 +1,81 @@
+/**
+ * Первичные данные для таблиц из entities.ts.
+ *
+ * Раньше эти записи были захардкожены прямо в компонентах экранов — они
+ * существовали только в памяти, не редактировались по-настоящему и исчезали
+ * при перезагрузке. Теперь это обычный посев базы: строки живут в SQLite,
+ * правятся как любые другие и удаляются сбросом системы.
+ *
+ * Ссылки на сотрудников используют идентификаторы из посева employees.
+ */
+import { ENTITIES } from './entities';
+
+const today = '2026-09-13';
+
+export const SEED_ROWS: Record<string, Record<string, unknown>[]> = {
+  candidates: [
+    { id: 'c1', fullName: 'Алексей Смирнов', position: 'Фронтенд разработчик', experience: '3 года', status: 'new', createdAt: today, note: null },
+    { id: 'c2', fullName: 'Елена Попова', position: 'UX/UI Дизайнер', experience: '5 лет', status: 'screening', createdAt: today, note: null },
+    { id: 'c3', fullName: 'Дмитрий Волков', position: 'Бэкенд разработчик', experience: '4 года', status: 'interview', createdAt: today, note: null },
+    { id: 'c4', fullName: 'Ольга Новикова', position: 'Менеджер проектов', experience: '6 лет', status: 'offer', createdAt: today, note: null },
+  ],
+
+  time_off_requests: [
+    { id: 'to1', employeeId: '1', type: 'vacation', dateFrom: '2026-08-15', dateTo: '2026-08-28', days: 14, status: 'approved', comment: null },
+    { id: 'to2', employeeId: '2', type: 'sick', dateFrom: '2026-07-01', dateTo: '2026-07-05', days: 5, status: 'pending', comment: null },
+    { id: 'to3', employeeId: '3', type: 'dayoff', dateFrom: '2026-06-10', dateTo: '2026-06-10', days: 1, status: 'rejected', comment: null },
+  ],
+
+  checklist_tasks: [
+    { id: 'ck1', employeeId: '5', kind: 'onboarding', title: 'Оформить трудовой договор', assignee: 'HR', done: true, comment: null, orderIndex: 1 },
+    { id: 'ck2', employeeId: '5', kind: 'onboarding', title: 'Выдать оборудование', assignee: 'IT', done: true, comment: null, orderIndex: 2 },
+    { id: 'ck3', employeeId: '5', kind: 'onboarding', title: 'Провести вводный инструктаж', assignee: 'Руководитель', done: false, comment: null, orderIndex: 3 },
+    { id: 'ck4', employeeId: '5', kind: 'onboarding', title: 'Назначить наставника', assignee: 'Руководитель', done: false, comment: null, orderIndex: 4 },
+    { id: 'ck5', employeeId: '4', kind: 'offboarding', title: 'Вернуть оборудование', assignee: 'IT', done: false, comment: null, orderIndex: 1 },
+    { id: 'ck6', employeeId: '4', kind: 'offboarding', title: 'Закрыть доступы', assignee: 'IT', done: false, comment: null, orderIndex: 2 },
+  ],
+
+  goals: [
+    { id: 'g1', employeeId: '1', title: 'Перевести отчётность на новый конструктор', progress: 60, status: 'on-track', period: '2026-Q3' },
+    { id: 'g2', employeeId: '2', title: 'Выполнить план продаж на квартал', progress: 100, status: 'completed', period: '2026-Q2' },
+    { id: 'g3', employeeId: '4', title: 'Автоматизировать сбор кадровой аналитики', progress: 25, status: 'on-track', period: '2026-Q3' },
+  ],
+
+  reviews: [
+    { id: 'r1', employeeId: '1', reviewer: 'Иванов Иван', period: '2026-Q2', score: 4.5, comment: 'Стабильный результат, берёт на себя сложные задачи.' },
+    { id: 'r2', employeeId: '2', reviewer: 'Иванов Иван', period: '2026-Q2', score: 4, comment: 'План выполнен, есть куда расти в работе с возражениями.' },
+  ],
+
+  kb_categories: [
+    { id: 'kc1', name: 'Кадровые процедуры', orderIndex: 1 },
+    { id: 'kc2', name: 'Документы и справки', orderIndex: 2 },
+    { id: 'kc3', name: 'Onboarding', orderIndex: 3 },
+  ],
+
+  kb_articles: [
+    { id: 'ka1', categoryId: 'kc1', title: 'Как оформить отпуск', contentHtml: '<p>Заявление подаётся не позднее чем за две недели до начала отпуска.</p>', reads: 0, createdAt: today, updatedAt: today },
+    { id: 'ka2', categoryId: 'kc2', title: 'Справка с места работы', contentHtml: '<p>Справка готовится в разделе «Генерация документов» по шаблону.</p>', reads: 0, createdAt: today, updatedAt: today },
+    { id: 'ka3', categoryId: 'kc3', title: 'Первый день нового сотрудника', contentHtml: '<p>Чек-лист адаптации заполняется в разделе «Онбординг».</p>', reads: 0, createdAt: today, updatedAt: today },
+  ],
+};
+
+/** Строки посева в порядке колонок таблицы — годится для INSERT в обеих ветках. */
+export function seedValues(table: string): { sql: string; rows: unknown[][] } | null {
+  const entity = ENTITIES.find((e) => e.table === table);
+  const rows = SEED_ROWS[table];
+  if (!entity || !rows?.length) return null;
+
+  const cols = ['id', ...entity.columns.map((c) => c.column)];
+  return {
+    sql: `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`,
+    rows: rows.map((row) => [
+      row.id,
+      ...entity.columns.map((c) => {
+        const value = row[c.field];
+        if (c.kind === 'bool') return value ? 1 : 0;
+        if (c.kind === 'number') return value ?? 0;
+        return value ?? null;
+      }),
+    ]),
+  };
+}

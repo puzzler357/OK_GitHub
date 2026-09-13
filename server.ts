@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { createServer as createViteServer } from 'vite';
 import db, { RESETTABLE_TABLES } from './src/db/sqlite';
+import { ENTITIES, insertSql, selectSql, updateSql, rowToObject, objectToValues } from './src/data/entities';
 
 export const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -60,6 +61,34 @@ app.post('/api/auth/reset-system', (req, res) => {
   
   res.json({ success: true, message: 'Все данные системы были успешно сброшены' });
 });
+
+// Маршруты для таблиц, описанных в src/data/entities.ts: подбор, отпуска,
+// онбординг, цели, оценки, база знаний. Форма у всех одинаковая, поэтому
+// маршруты строятся из описания, а не копируются семь раз.
+for (const entity of ENTITIES) {
+  const base = `/api/${entity.route}`;
+
+  app.get(base, (_req, res) => {
+    res.json(db.prepare(selectSql(entity)).all().map((row: any) => rowToObject(entity, row)));
+  });
+
+  app.post(base, (req, res) => {
+    const id = req.body.id || Math.random().toString(36).substring(7);
+    db.prepare(insertSql(entity)).run(id, ...objectToValues(entity, req.body));
+    res.json({ id });
+  });
+
+  app.put(`${base}/:id`, (req, res) => {
+    const update = updateSql(entity, req.body);
+    if (update) db.prepare(update.sql).run(...update.values, req.params.id);
+    res.json({ success: true });
+  });
+
+  app.delete(`${base}/:id`, (req, res) => {
+    db.prepare(`DELETE FROM ${entity.table} WHERE id = ?`).run(req.params.id);
+    res.json({ success: true });
+  });
+}
 
 // API Employees
 app.get('/api/employees', (req, res) => {

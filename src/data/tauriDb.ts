@@ -6,6 +6,10 @@ import bcrypt from 'bcryptjs';
 import type {
   Employee, Department, Position, TimesheetRecord, ArchiveRecord, ArchiveFilters, Template, LoginResult,
 } from './types';
+import {
+  ENTITIES, ENTITY_BY_TABLE, allSchemaSql, insertSql, selectSql, updateSql, rowToObject, objectToValues,
+} from './entities';
+import { seedValues } from './seedData';
 
 const DB_URL = 'sqlite:local-hr-docs.db';
 
@@ -96,6 +100,7 @@ async function initSchema(db: Database) {
     CREATE INDEX IF NOT EXISTS idx_archives_department ON archives(department);
     CREATE INDEX IF NOT EXISTS idx_positions_department ON positions(department_id);
     CREATE INDEX IF NOT EXISTS idx_departments_parent ON departments(parent_id);
+    ${allSchemaSql()}
   `);
 
   // База, созданная предыдущей версией схемы, колонки tab_number не имеет.
@@ -194,6 +199,12 @@ async function seedIfEmpty(db: Database) {
     for (const a of arch) {
       await db.execute('INSERT INTO archives (id, year, month, employee_id, employee_name, department, position, salary, hours_worked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', a);
     }
+  }
+
+  for (const entity of ENTITIES) {
+    const seed = seedValues(entity.table);
+    if (!seed) continue;
+    for (const row of seed.rows) await db.execute(seed.sql, row);
   }
 
   await db.execute('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', [SEED_FLAG, new Date().toISOString()]);
@@ -384,6 +395,43 @@ export async function deleteArchiveRow(id: string): Promise<void> {
   await db.execute('DELETE FROM archives WHERE id = ?', [id]);
 }
 
+// ---- Сущности, описанные в entities.ts ----
+// Один набор операций на все семь таблиц: расписывать 28 почти одинаковых
+// функций руками — верный способ развести ветки доступа к данным.
+
+export async function listEntity(table: string): Promise<any[]> {
+  const entity = ENTITY_BY_TABLE.get(table);
+  if (!entity) throw new Error(`Неизвестная таблица: ${table}`);
+  const db = await getDb();
+  const rows = await db.select<any[]>(selectSql(entity));
+  return rows.map((r) => rowToObject(entity, r));
+}
+
+export async function createEntity(table: string, data: any): Promise<{ id: string }> {
+  const entity = ENTITY_BY_TABLE.get(table);
+  if (!entity) throw new Error(`Неизвестная таблица: ${table}`);
+  const db = await getDb();
+  const id = data.id || rid();
+  await db.execute(insertSql(entity), [id, ...objectToValues(entity, data)]);
+  return { id };
+}
+
+export async function updateEntity(table: string, id: string, patch: any): Promise<void> {
+  const entity = ENTITY_BY_TABLE.get(table);
+  if (!entity) throw new Error(`Неизвестная таблица: ${table}`);
+  const update = updateSql(entity, patch);
+  if (!update) return;
+  const db = await getDb();
+  await db.execute(update.sql, [...update.values, id]);
+}
+
+export async function deleteEntity(table: string, id: string): Promise<void> {
+  const entity = ENTITY_BY_TABLE.get(table);
+  if (!entity) throw new Error(`Неизвестная таблица: ${table}`);
+  const db = await getDb();
+  await db.execute(`DELETE FROM ${entity.table} WHERE id = ?`, [id]);
+}
+
 // ---- Auth (локальная, без JWT) ----
 export async function login(email: string, password: string): Promise<LoginResult> {
   const db = await getDb();
@@ -413,7 +461,7 @@ export async function resetSystem(adminPassword: string): Promise<void> {
   // users намеренно не трогаем: учётная запись владельца должна пережить
   // сброс, иначе в приложение будет не войти. Список совпадает с серверным
   // RESETTABLE_TABLES в src/db/sqlite.ts.
-  for (const table of ['employees', 'departments', 'positions', 'templates', 'timesheets', 'archives']) {
+  for (const table of ['employees', 'departments', 'positions', 'templates', 'timesheets', 'archives', ...ENTITIES.map((e) => e.table)]) {
     await db.execute(`DELETE FROM ${table}`);
   }
 }

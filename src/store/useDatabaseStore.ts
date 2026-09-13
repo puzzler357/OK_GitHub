@@ -1,11 +1,17 @@
 import { create } from 'zustand';
 import * as api from '../data';
+import { ENTITIES, ENTITY_BY_TABLE } from '../data/entities';
 import type {
   Employee, Department, Position, TimesheetRecord, ArchiveRecord, ArchiveFilters, Template,
+  Candidate, TimeOffRequest, ChecklistTask, Goal, Review, KbCategory, KbArticle,
 } from '../data/types';
 
 // Ре-экспорт типов: страницы импортируют их из этого модуля.
-export type { Employee, Department, Position, TimesheetRecord, ArchiveRecord, ArchiveFilters, Template } from '../data/types';
+export type {
+  Employee, Department, Position, TimesheetRecord, ArchiveRecord, ArchiveFilters, Template,
+  Candidate, TimeOffRequest, ChecklistTask, Goal, Review, KbCategory, KbArticle,
+} from '../data/types';
+export { TABLES } from '../data/entities';
 
 // У тех, кто уже пользовался приложением, в localStorage лежит слепок стора
 // от прежней версии с persist. Он больше не читается и только занимает квоту —
@@ -46,6 +52,15 @@ interface DatabaseState {
   addDepartment: (dep: Omit<Department, 'id'>) => Promise<void>;
   updateDepartment: (id: string, data: Partial<Department>) => Promise<void>;
   deleteDepartment: (id: string) => Promise<void>;
+  // Экраны подбора, отпусков, онбординга, оценки и базы знаний.
+  candidates: Candidate[];
+  timeOffRequests: TimeOffRequest[];
+  checklistTasks: ChecklistTask[];
+  goals: Goal[];
+  reviews: Review[];
+  kbCategories: KbCategory[];
+  kbArticles: KbArticle[];
+
   addPosition: (pos: Omit<Position, 'id'>) => Promise<void>;
   updatePosition: (id: string, data: Partial<Position>) => Promise<void>;
   deletePosition: (id: string) => Promise<void>;
@@ -62,6 +77,13 @@ interface DatabaseState {
 //
 // Настройки интерфейса persist сохраняет — но это useAppStore, десяток
 // скалярных полей, а не таблицы.
+interface EntityActions {
+  /** Универсальные операции над таблицами из entities.ts. */
+  createIn: <T extends { id: string }>(table: string, data: Omit<T, 'id'> & { id?: string }) => Promise<string>;
+  updateIn: (table: string, id: string, patch: Record<string, unknown>) => Promise<void>;
+  removeFrom: (table: string, id: string) => Promise<void>;
+}
+
 interface FetchActions {
   fetchAll: () => Promise<void>;
   fetchTimesheets: (year: number, month: number) => Promise<void>;
@@ -69,7 +91,7 @@ interface FetchActions {
   fetchArchiveFacets: () => Promise<void>;
 }
 
-export const useDatabaseStore = create<DatabaseState & FetchActions>()(
+export const useDatabaseStore = create<DatabaseState & FetchActions & EntityActions>()(
   (set) => ({
     employees: [],
     departments: [],
@@ -79,21 +101,66 @@ export const useDatabaseStore = create<DatabaseState & FetchActions>()(
     archiveFacets: { years: [], departments: [] },
     templates: [],
 
+    candidates: [],
+    timeOffRequests: [],
+    checklistTasks: [],
+    goals: [],
+    reviews: [],
+    kbCategories: [],
+    kbArticles: [],
+
     // Справочники грузятся целиком — их размер ограничен штатом и структурой.
     // Табель и архив сюда не входят: они растут линейно по времени, и их
     // запрашивают срезом экраны, которым они нужны.
     fetchAll: async () => {
       try {
-        const [employees, templates, departments, positions] = await Promise.all([
+        const [employees, templates, departments, positions, ...entityRows] = await Promise.all([
           api.listEmployees(),
           api.listTemplates(),
           api.listDepartments(),
           api.listPositions(),
+          ...ENTITIES.map((e) => api.listEntity<any>(e.table)),
         ]);
-        set({ employees, templates, departments, positions });
+
+        const entityState: Record<string, unknown> = {};
+        ENTITIES.forEach((e, i) => { entityState[e.stateKey] = entityRows[i]; });
+
+        set({ employees, templates, departments, positions, ...entityState } as any);
       } catch (e) {
         console.error('Failed to fetch initial data', e);
       }
+    },
+
+    // Одна пара операций на все семь таблиц: расписывать 28 почти одинаковых
+    // действий значило бы копировать один и тот же код с шансом разойтись.
+    createIn: async (table, data) => {
+      const entity = ENTITY_BY_TABLE.get(table);
+      if (!entity) throw new Error(`Неизвестная таблица: ${table}`);
+      const { id } = await api.createEntity(table, data);
+      set((state) => ({
+        [entity.stateKey]: [...(state as any)[entity.stateKey], { ...data, id }],
+      }) as any);
+      return id;
+    },
+
+    updateIn: async (table, id, patch) => {
+      const entity = ENTITY_BY_TABLE.get(table);
+      if (!entity) throw new Error(`Неизвестная таблица: ${table}`);
+      // Сначала стор, потом БД: перетаскивание карточки и галочки в чек-листе
+      // должны отзываться мгновенно.
+      set((state) => ({
+        [entity.stateKey]: (state as any)[entity.stateKey].map((row: any) => (row.id === id ? { ...row, ...patch } : row)),
+      }) as any);
+      await api.updateEntity(table, id, patch);
+    },
+
+    removeFrom: async (table, id) => {
+      const entity = ENTITY_BY_TABLE.get(table);
+      if (!entity) throw new Error(`Неизвестная таблица: ${table}`);
+      set((state) => ({
+        [entity.stateKey]: (state as any)[entity.stateKey].filter((row: any) => row.id !== id),
+      }) as any);
+      await api.deleteEntity(table, id);
     },
 
     fetchTimesheets: async (year, month) => {

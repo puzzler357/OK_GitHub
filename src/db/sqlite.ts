@@ -1,6 +1,8 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import bcrypt from 'bcryptjs';
+import { ENTITIES, allSchemaSql } from '../data/entities';
+import { seedValues } from '../data/seedData';
 
 // DB_PATH позволяет подменить файл базы (используется автотестами для изоляции).
 const dbPath = process.env.DB_PATH || path.join(process.cwd(), 'local-hr-docs.db');
@@ -86,6 +88,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_departments_parent ON departments(parent_id);
 `);
 
+// Таблицы экранов подбора, отпусков, онбординга, оценки и базы знаний.
+// DDL генерируется из общего описания (src/data/entities.ts), чтобы схема
+// веб-режима и нативного не разъезжались.
+db.exec(`
+  ${allSchemaSql()}
+`);
+
 // Миграции для баз, созданных предыдущими версиями схемы.
 function addColumnIfMissing(table: string, column: string, definition: string) {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
@@ -151,6 +160,15 @@ function seed() {
   insertArchive.run('a3', 2023, 11, '1', 'Иванов Иван Иванович', 'IT', 'Старший разработчик', 500000, 168);
   insertArchive.run('a4', 2023, 11, '2', 'Петров Петр Петрович', 'Продажи', 'Менеджер по продажам', 280000, 160);
   insertArchive.run('a5', 2022, 12, '1', 'Иванов Иван Иванович', 'IT', 'Разработчик', 400000, 160);
+
+  // Данные экранов подбора, отпусков, онбординга, оценки и базы знаний —
+  // из общего набора, чтобы веб и нативный режим сеяли одно и то же.
+  for (const entity of ENTITIES) {
+    const seed = seedValues(entity.table);
+    if (!seed) continue;
+    const stmt = db.prepare(seed.sql);
+    for (const row of seed.rows) stmt.run(...row);
+  }
 }
 
 // Посев выполняется ровно один раз за жизнь базы. Отметка в meta важна не
@@ -175,6 +193,7 @@ export const RESETTABLE_TABLES = [
   'templates',
   'timesheets',
   'archives',
-] as const;
+  ...ENTITIES.map((e) => e.table),
+];
 
 export default db;

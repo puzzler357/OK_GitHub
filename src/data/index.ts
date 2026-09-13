@@ -2,6 +2,7 @@
 // В нативном приложении (Tauri) работает напрямую с локальной SQLite,
 // в вебе (dev через браузер) — с локальным Express-бэкендом по /api.
 import * as tauri from './tauriDb';
+import { ENTITY_BY_TABLE } from './entities';
 import type {
   Employee, Department, Position, TimesheetRecord, ArchiveRecord, ArchiveFilters, Template, LoginResult,
 } from './types';
@@ -147,6 +148,30 @@ export const createArchive = (rec: Omit<ArchiveRecord, 'id'> & { id?: string }):
 
 export const deleteArchive = (id: string): Promise<void> =>
   isTauri ? tauri.deleteArchiveRow(id) : fetch(`/api/archives/${id}`, { method: 'DELETE' }).then(() => undefined);
+
+// ---- Сущности из entities.ts ----
+// Обе ветки принимают имя таблицы: экраны работают через типизированные
+// обёртки ниже и самого имени не видят.
+const routeOf = (table: string): string => {
+  const entity = ENTITY_BY_TABLE.get(table);
+  if (!entity) throw new Error(`Неизвестная таблица: ${table}`);
+  return `/api/${entity.route}`;
+};
+
+export const listEntity = <T>(table: string): Promise<T[]> =>
+  isTauri ? tauri.listEntity(table) : fetch(routeOf(table)).then((r) => r.json());
+
+export const createEntity = (table: string, data: any): Promise<{ id: string }> =>
+  isTauri ? tauri.createEntity(table, data)
+    : fetch(routeOf(table), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(jsonOrThrow);
+
+export const updateEntity = (table: string, id: string, patch: any): Promise<void> =>
+  isTauri ? tauri.updateEntity(table, id, patch)
+    : fetch(`${routeOf(table)}/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) }).then(jsonOrThrow).then(() => undefined);
+
+export const deleteEntity = (table: string, id: string): Promise<void> =>
+  isTauri ? tauri.deleteEntity(table, id)
+    : fetch(`${routeOf(table)}/${id}`, { method: 'DELETE' }).then(jsonOrThrow).then(() => undefined);
 
 // ---- Auth ----
 export const login = (email: string, password: string): Promise<LoginResult> =>

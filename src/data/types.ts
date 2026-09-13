@@ -63,6 +63,81 @@ export interface Template {
   blocks: { id: string; type: string; content: string }[];
 }
 
+// ---- Сущности экранов, переведённых на БД (см. entities.ts) ----
+
+export type CandidateStatus = 'new' | 'screening' | 'interview' | 'offer' | 'hired' | 'rejected';
+
+export interface Candidate {
+  id: string;
+  fullName: string;
+  position: string;
+  experience?: string;
+  status: CandidateStatus;
+  createdAt: string;
+  note?: string;
+}
+
+export type TimeOffStatus = 'pending' | 'approved' | 'rejected';
+
+export interface TimeOffRequest {
+  id: string;
+  employeeId: string;
+  /** vacation | sick | unpaid | remote */
+  type: string;
+  dateFrom: string;
+  dateTo: string;
+  days: number;
+  status: TimeOffStatus;
+  comment?: string;
+}
+
+export interface ChecklistTask {
+  id: string;
+  employeeId: string;
+  kind: 'onboarding' | 'offboarding';
+  title: string;
+  assignee?: string;
+  done: boolean;
+  comment?: string;
+  orderIndex: number;
+}
+
+export interface Goal {
+  id: string;
+  employeeId: string;
+  title: string;
+  /** Процент выполнения, 0-100. */
+  progress: number;
+  /** active | done | overdue */
+  status: string;
+  period: string;
+}
+
+export interface Review {
+  id: string;
+  employeeId: string;
+  reviewer: string;
+  period: string;
+  score: number;
+  comment?: string;
+}
+
+export interface KbCategory {
+  id: string;
+  name: string;
+  orderIndex: number;
+}
+
+export interface KbArticle {
+  id: string;
+  categoryId?: string;
+  title: string;
+  contentHtml?: string;
+  reads: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AuthUser {
   id: string;
   email: string;
