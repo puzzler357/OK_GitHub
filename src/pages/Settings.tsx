@@ -20,6 +20,9 @@ export default function Settings() {
     currencySymbol, currencyPosition, currencyDecimals, thousandsSeparator,
     setCurrencySymbol, setCurrencyPosition, setCurrencyDecimals, setThousandsSeparator,
     docxTemplatePath, setDocxTemplatePath,
+    orgName, orgInn, orgDirector, dateFormat, startScreen,
+    setOrgName, setOrgInn, setOrgDirector, setDateFormat, setStartScreen,
+    lockTimeoutMinutes, setLockTimeoutMinutes, lock,
   } = useAppStore();
   const money = useMoney();
   const [activeTab, setActiveTab] = useState('general');
@@ -115,15 +118,58 @@ export default function Settings() {
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium mb-2 text-secondary">{t('settings.general.orgName')}</label>
-                  <input type="text" className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500" />
+                  <input
+                    type="text"
+                    value={orgName}
+                    onChange={(e) => { setOrgName(e.target.value); logSetting('orgName', e.target.value); }}
+                    className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2 text-secondary">{t('settings.general.inn')}</label>
-                  <input type="text" className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500" />
+                  <input
+                    type="text"
+                    value={orgInn}
+                    onChange={(e) => { setOrgInn(e.target.value); logSetting('orgInn', e.target.value); }}
+                    className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2 text-secondary">{t('settings.general.director')}</label>
-                  <input type="text" className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500" />
+                  <input
+                    type="text"
+                    value={orgDirector}
+                    onChange={(e) => { setOrgDirector(e.target.value); logSetting('orgDirector', e.target.value); }}
+                    className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-secondary">{t('settings.general.dateFormat')}</label>
+                    <select
+                      value={dateFormat}
+                      onChange={(e) => { setDateFormat(e.target.value as any); logSetting('dateFormat', e.target.value); }}
+                      className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                    >
+                      <option value="dd.MM.yyyy">31.12.2026</option>
+                      <option value="yyyy-MM-dd">2026-12-31</option>
+                      <option value="MM/dd/yyyy">12/31/2026</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-secondary">{t('settings.general.startScreen')}</label>
+                    <select
+                      value={startScreen}
+                      onChange={(e) => { setStartScreen(e.target.value); logSetting('startScreen', e.target.value); }}
+                      className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                    >
+                      <option value="/dashboard">{t('nav.dashboard')}</option>
+                      <option value="/employees">{t('nav.employees')}</option>
+                      <option value="/timesheet">{t('nav.timesheet')}</option>
+                      <option value="/calendar">{t('nav.calendar')}</option>
+                      <option value="/reports">{t('nav.reports')}</option>
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2 text-secondary">{t('settings.language')}</label>
@@ -280,17 +326,37 @@ export default function Settings() {
 
           {activeTab === 'security' && (
             <div className="space-y-8 max-w-5xl">
+              {/* На месте нерабочего тумблера «вход без пароля» — блокировка
+                  по бездействию: она хотя бы что-то делает и работает на
+                  безопасность, а не против неё. */}
               <div className="bg-surface-2 border border-line rounded-2xl p-6">
                 <div className="flex items-center gap-2 mb-2">
                   <ShieldCheck className="w-5 h-5 text-emerald-500" />
-                  <h3 className="text-lg font-medium">{t('settings.security.passwordless')}</h3>
+                  <h3 className="text-lg font-medium">{t('settings.security.lockTitle')}</h3>
                 </div>
-                <p className="text-sm text-muted mb-6">{t('settings.security.passwordlessHint')}</p>
-                <div className="flex items-center gap-3">
-                  <button className="w-12 h-6 bg-surface-4 rounded-full relative transition-colors">
-                    <span className="w-5 h-5 bg-surface-4 rounded-full absolute left-0.5 top-0.5"></span>
+                <p className="text-sm text-muted mb-6">{t('settings.security.lockHint')}</p>
+
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="w-56">
+                    <label className="block text-sm font-medium mb-2 text-secondary">{t('settings.security.lockTimeout')}</label>
+                    <select
+                      value={lockTimeoutMinutes}
+                      onChange={(e) => { setLockTimeoutMinutes(Number(e.target.value)); logSetting('lockTimeoutMinutes', e.target.value); }}
+                      className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                    >
+                      <option value={0}>{t('settings.security.lockOff')}</option>
+                      {[5, 10, 15, 30, 60].map(n => (
+                        <option key={n} value={n}>{t('settings.security.lockMinutes', { n })}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={lock}
+                    className="bg-surface-3 hover:bg-surface-hover border border-line text-secondary px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                  >
+                    {t('settings.security.lockNow')}
                   </button>
-                  <span className="text-sm font-medium text-secondary">{t('settings.security.off')}</span>
                 </div>
               </div>
 

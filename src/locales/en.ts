@@ -534,6 +534,8 @@ export const en = {
         appearance: "Appearance"
       },
       general: {
+        dateFormat: "Date format",
+        startScreen: "Start screen",
         title: "General organization settings",
         orgName: "Organization name",
         inn: "Tax ID",
@@ -558,6 +560,15 @@ export const en = {
         error: "Failed to change password"
       },
       security: {
+        lockTitle: "Idle lock",
+        lockHint: "After the configured period of inactivity the app is covered by a lock screen. Only the owner password unlocks it.",
+        lockTimeout: "Idle timeout",
+        lockOff: "Disabled",
+        lockMinutes: "{{n}} min",
+        lockedTitle: "Application locked",
+        lockedHint: "Enter the owner password to continue",
+        unlock: "Unlock",
+        lockNow: "Lock now",
         passwordless: "Passwordless login",
         passwordlessHint: "When enabled, a “Sign in without password” button appears on the login screen for automatic owner sign-in. Use only on a trusted device.",
         on: "Enabled",

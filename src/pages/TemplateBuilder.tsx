@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Save, Plus, Type, Table as TableIcon, FileSignature, LayoutTemplate, Printer, Download, Trash2 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDatabaseStore } from '../store/useDatabaseStore';
+import { useAppStore } from '../store/useAppStore';
 
 export default function TemplateBuilder() {
   const { t } = useTranslation();
@@ -11,12 +12,14 @@ export default function TemplateBuilder() {
   const templateId = searchParams.get('id');
   
   const { templates, addTemplate, updateTemplate } = useDatabaseStore();
+  const orgName = useAppStore((s) => s.orgName);
 
   const [templateName, setTemplateName] = useState(t('builder.newTemplate'));
-  // Стартовый контент нового шаблона (seed-документ). Содержит {{переменные}},
-  // подставляемые при генерации; текст редактируется пользователем.
+  // Стартовый контент нового шаблона. Содержит {{переменные}}, подставляемые
+  // при генерации; название организации берётся из «Настройки → Общие», а не
+  // из захардкоженного «ООО "Глобал Тек"».
   const [blocks, setBlocks] = useState([
-    { id: '1', type: 'text', content: 'Справка дана {{fullName}} в том, что он(а) действительно работает в ООО "Глобал Тек" в должности {{position}}.' },
+    { id: '1', type: 'text', content: `Справка дана {{fullName}} в том, что он(а) действительно работает в ${orgName} в должности {{position}}.` },
   ]);
   const printRef = useRef<HTMLDivElement>(null);
 

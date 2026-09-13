@@ -534,6 +534,8 @@ export const tk = {
         appearance: "Görnüş"
       },
       general: {
+        dateFormat: "Sene formaty",
+        startScreen: "Başlangyç ekran",
         title: "Guramanyň umumy sazlamalary",
         orgName: "Guramanyň ady",
         inn: "Salgyt belgisi (INN)",
@@ -558,6 +560,15 @@ export const tk = {
         error: "Paroly üýtgetmekde ýalňyşlyk"
       },
       security: {
+        lockTitle: "Hereketsizlik boýunça gulplama",
+        lockHint: "Bellenen wagtyň dowamynda hereket bolmasa, programma gulp ekrany bilen ýapylýar. Diňe eýesiniň paroly açýar.",
+        lockTimeout: "Hereketsizlik wagty",
+        lockOff: "Öçürilen",
+        lockMinutes: "{{n}} min",
+        lockedTitle: "Programma gulplandy",
+        lockedHint: "Dowam etmek üçin eýesiniň parolyny giriziň",
+        unlock: "Gulpy aç",
+        lockNow: "Häzir gulpla",
         passwordless: "Parolsyz giriş",
         passwordlessHint: "Işjeňleşdirilende, giriş sahypasynda eýe hökmünde awtomatiki girmek üçin «Parolsyz gir» düwmesi peýda bolýar. Diňe ynamdar enjamda ulanyň.",
         on: "Işjeň",

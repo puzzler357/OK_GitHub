@@ -11,6 +11,7 @@ export default function DocumentGenerator() {
   const { templates, employees } = useDatabaseStore();
   const money = useMoney();
   const docxTemplatePath = useAppStore((s) => s.docxTemplatePath);
+  const orgName = useAppStore((s) => s.orgName);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [variables, setVariables] = useState<Record<string, string>>({});
@@ -48,7 +49,7 @@ export default function DocumentGenerator() {
     if (!template) return;
     try {
       await generateDocx(docxTemplatePath, {
-        orgName: 'HRDesk',
+        orgName,
         title: template.name,
         date: new Date().toLocaleDateString(),
         paragraphs: plainParagraphs(),

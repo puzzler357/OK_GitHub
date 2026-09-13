@@ -5,6 +5,8 @@ import { DEFAULT_CURRENCY } from '../lib/money';
 import type { CurrencyDecimals, CurrencyPosition, ThousandsSeparator } from '../lib/money';
 
 type Theme = 'light' | 'dark' | 'system';
+/** Формат отображения дат: строка шаблона date-fns. */
+export type DateFormat = 'dd.MM.yyyy' | 'yyyy-MM-dd' | 'MM/dd/yyyy';
 type AccentColor = 'indigo' | 'purple' | 'blue' | 'emerald' | 'rose' | 'amber';
 type Density = 'compact' | 'standard' | 'spacious';
 type FontSize = 'small' | 'standard' | 'large';
@@ -39,6 +41,26 @@ interface AppState {
   /** Путь к .docx-бланку для генерации документов (см. scripts/makeDocxTemplate.ts). */
   docxTemplatePath: string;
   setDocxTemplatePath: (path: string) => void;
+
+  // Реквизиты организации и общие параметры. Раньше поля были нарисованы,
+  // но никуда не сохранялись, а название организации жило хардкодом в шаблонах.
+  orgName: string;
+  orgInn: string;
+  orgDirector: string;
+  dateFormat: DateFormat;
+  startScreen: string;
+  setOrgName: (value: string) => void;
+  setOrgInn: (value: string) => void;
+  setOrgDirector: (value: string) => void;
+  setDateFormat: (value: DateFormat) => void;
+  setStartScreen: (value: string) => void;
+
+  // Блокировка по бездействию. 0 — выключена.
+  lockTimeoutMinutes: number;
+  locked: boolean;
+  setLockTimeoutMinutes: (minutes: number) => void;
+  lock: () => void;
+  unlock: () => void;
   setTheme: (theme: Theme) => void;
   setAccentColor: (color: AccentColor) => void;
   setDensity: (density: Density) => void;
@@ -75,6 +97,25 @@ export const useAppStore = create<AppState>()(
 
       docxTemplatePath: '/templates/blank.docx',
       setDocxTemplatePath: (docxTemplatePath) => set({ docxTemplatePath }),
+
+      orgName: 'HRDesk',
+      orgInn: '',
+      orgDirector: '',
+      dateFormat: 'dd.MM.yyyy',
+      startScreen: '/dashboard',
+      setOrgName: (orgName) => set({ orgName }),
+      setOrgInn: (orgInn) => set({ orgInn }),
+      setOrgDirector: (orgDirector) => set({ orgDirector }),
+      setDateFormat: (dateFormat) => set({ dateFormat }),
+      setStartScreen: (startScreen) => set({ startScreen }),
+
+      lockTimeoutMinutes: 15,
+      // Состояние блокировки персистится намеренно: перезагрузка страницы не
+      // должна быть способом обойти её.
+      locked: false,
+      setLockTimeoutMinutes: (lockTimeoutMinutes) => set({ lockTimeoutMinutes }),
+      lock: () => set({ locked: true }),
+      unlock: () => set({ locked: false }),
       setTheme: (theme) => {
         set({ theme });
         applyTheme(theme);
@@ -97,7 +138,7 @@ export const useAppStore = create<AppState>()(
       },
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       login: (user, token) => set({ user, token }),
-      logout: () => set({ user: null, token: null }),
+      logout: () => set({ user: null, token: null, locked: false }),
     }),
     {
       name: 'hr-docs-app-storage',

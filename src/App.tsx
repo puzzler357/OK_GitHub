@@ -27,12 +27,16 @@ import Performance from './pages/Performance';
 import KnowledgeBase from './pages/KnowledgeBase';
 import Archive from './pages/Archive';
 
+import LockScreen from './components/LockScreen';
+import { useIdleLock } from './lib/useIdleLock';
 import { useAppStore } from './store/useAppStore';
 import { useDatabaseStore } from './store/useDatabaseStore';
 
 export default function App() {
-  const { user } = useAppStore();
+  const { user, startScreen, locked } = useAppStore();
   const { fetchAll } = useDatabaseStore();
+
+  useIdleLock();
 
   useEffect(() => {
     if (user) {
@@ -44,11 +48,18 @@ export default function App() {
     return <Login />;
   }
 
+  // Блокировка закрывает приложение целиком: данные не должны оставаться
+  // на экране, пока владелец отошёл.
+  if (locked) {
+    return <LockScreen />;
+  }
+
   return (
     <BrowserRouter>
       <Layout>
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          {/* Стартовый экран настраивается в «Настройки → Общие». */}
+          <Route path="/" element={<Navigate to={startScreen || '/dashboard'} replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/employees" element={<Employees />} />
           <Route path="/org-chart" element={<OrgChart />} />
