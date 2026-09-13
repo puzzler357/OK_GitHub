@@ -560,6 +560,18 @@ export const en = {
         error: "Failed to change password"
       },
       security: {
+        resetAppearance: "Reset appearance",
+        resetSettings: "Reset all settings",
+        passwordNeeded: "The password is required for the data operations below",
+        clearModules: "Clear module data",
+        clearBtn: "Clear selected",
+        clearConfirm: "Data of the selected modules will be deleted permanently. Continue?",
+        cleared: "Tables cleared: {{n}}",
+        factoryTitle: "Full factory reset",
+        factoryHint: "All data and settings are deleted. To confirm, type «{{phrase}}» and the owner password. Make a backup first.",
+        factoryPhraseWord: "DELETE",
+        factoryPhraseWrong: "Type «{{phrase}}» exactly to confirm",
+        backupFirst: "Have you made a backup? Without one there is nothing to restore from.",
         lockTitle: "Idle lock",
         lockHint: "After the configured period of inactivity the app is covered by a lock screen. Only the owner password unlocks it.",
         lockTimeout: "Idle timeout",
@@ -597,6 +609,14 @@ export const en = {
         diff: "Changes (Diff)"
       },
       backup: {
+        restore: "Restore from file",
+        restoreConfirm: "Restoring will replace all current data with the file contents. Continue?",
+        restored: "Records restored: {{n}}",
+        badFile: "The file could not be parsed as JSON",
+        failed: "The operation failed",
+        empty: "No backups created yet",
+        rows: "{{n}} records",
+        rowsCol: "Records",
         title: "Database backup",
         subtitle: "Configure automatic backups and manage database snapshots.",
         createFull: "Create full snapshot",

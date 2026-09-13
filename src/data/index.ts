@@ -179,6 +179,18 @@ export const applyMovement = (movement: any): Promise<{ id: string; movement: an
     : fetch('/api/movements/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(movement) }).then(jsonOrThrow);
 
 // ---- Auth ----
+export const resetTables = (adminPassword: string, tables: string[]): Promise<{ cleared: string[] }> =>
+  isTauri ? tauri.resetTables(adminPassword, tables)
+    : fetch('/api/reset/tables', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminPassword, tables }) }).then(jsonOrThrow);
+
+// ---- Резервные копии ----
+export const exportBackup = (): Promise<{ version: number; createdAt: string; data: Record<string, unknown[]> }> =>
+  isTauri ? tauri.exportBackup() : fetch('/api/backup').then(jsonOrThrow);
+
+export const restoreBackup = (payload: unknown): Promise<{ restored: number; tables: number }> =>
+  isTauri ? tauri.restoreBackup(payload)
+    : fetch('/api/backup/restore', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(jsonOrThrow);
+
 export const authStatus = (): Promise<{ needsSetup: boolean }> =>
   isTauri ? tauri.authStatus() : fetch('/api/auth/status').then(jsonOrThrow);
 

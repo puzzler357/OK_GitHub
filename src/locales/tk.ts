@@ -560,6 +560,18 @@ export const tk = {
         error: "Paroly üýtgetmekde ýalňyşlyk"
       },
       security: {
+        resetAppearance: "Bezegi täzeden gur",
+        resetSettings: "Ähli sazlamalary täzeden gur",
+        passwordNeeded: "Aşakdaky maglumat amallary üçin parol gerek",
+        clearModules: "Modul maglumatlaryny arassala",
+        clearBtn: "Saýlananlary arassala",
+        clearConfirm: "Saýlanan modullaryň maglumatlary hemişelik pozular. Dowam edilsinmi?",
+        cleared: "Arassalanan tablisalar: {{n}}",
+        factoryTitle: "Zawod ýagdaýyna doly dikeldiş",
+        factoryHint: "Ähli maglumatlar we sazlamalar pozulýar. Tassyklamak üçin «{{phrase}}» sözüni we eýesiniň parolyny giriziň. Ilki nusga alyň.",
+        factoryPhraseWord: "POZMAK",
+        factoryPhraseWrong: "Tassyklamak üçin «{{phrase}}» sözüni takyk giriziň",
+        backupFirst: "Ätiýaçlyk nusga aldyňyzmy? Onsuz dikeltmäge zat bolmaz.",
         lockTitle: "Hereketsizlik boýunça gulplama",
         lockHint: "Bellenen wagtyň dowamynda hereket bolmasa, programma gulp ekrany bilen ýapylýar. Diňe eýesiniň paroly açýar.",
         lockTimeout: "Hereketsizlik wagty",
@@ -597,6 +609,14 @@ export const tk = {
         diff: "Üýtgeşmeler (Diff)"
       },
       backup: {
+        restore: "Faýldan dikeltmek",
+        restoreConfirm: "Dikeltmek häzirki maglumatlaryň ählisini faýldakylar bilen çalşar. Dowam edilsinmi?",
+        restored: "Dikeldilen ýazgylar: {{n}}",
+        badFile: "Faýly JSON hökmünde okap bolmady",
+        failed: "Amaly ýerine ýetirip bolmady",
+        empty: "Nusgalar entek döredilmedi",
+        rows: "{{n}} ýazgy",
+        rowsCol: "Ýazgylar",
         title: "Maglumat binýadynyň ätiýaçlyk nusgasy",
         subtitle: "Awtomatiki nusgalary sazlaň we maglumat binýadynyň suratlaryny dolandyryň.",
         createFull: "Doly nusga döret",

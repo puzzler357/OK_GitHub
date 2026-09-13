@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store/useAppStore';
 import { useDatabaseStore, TABLES } from '../store/useDatabaseStore';
-import type { AuditEntry } from '../store/useDatabaseStore';
+import type { AuditEntry, BackupEntry } from '../store/useDatabaseStore';
 import { exportToExcel } from '../lib/excel';
 import { useMoney } from '../lib/money';
 import type { CurrencyDecimals, CurrencyPosition, ThousandsSeparator } from '../lib/money';
@@ -23,12 +23,13 @@ export default function Settings() {
     orgName, orgInn, orgDirector, dateFormat, startScreen,
     setOrgName, setOrgInn, setOrgDirector, setDateFormat, setStartScreen,
     lockTimeoutMinutes, setLockTimeoutMinutes, lock,
+    resetAppearance, resetSettings,
   } = useAppStore();
   const money = useMoney();
   const [activeTab, setActiveTab] = useState('general');
 
   
-  const { auditLog, createIn } = useDatabaseStore();
+  const { auditLog, backups, createIn, removeFrom, fetchAll } = useDatabaseStore();
 
   // Фильтры журнала. Раньше оба селекта и поле даты были декорацией.
   const [auditAction, setAuditAction] = useState('all');
@@ -73,11 +74,121 @@ export default function Settings() {
     });
   };
 
-  const mockBackups = [
-    { id: 1, file: 'backup_20231025_0300.sql.gz', size: '145 MB', created: '25.10.2023 03:00' },
-    { id: 2, file: 'backup_20231024_0300.sql.gz', size: '144 MB', created: '24.10.2023 03:00' },
-    { id: 3, file: 'backup_20231023_0300.sql.gz', size: '142 MB', created: '23.10.2023 03:00' },
+  // Сброс устроен ступенями: от безобидного сброса оформления до полного
+  // factory reset. Раньше была одна кнопка, стиравшая всё разом.
+  const MODULE_TABLES: { table: string; label: string }[] = [
+    { table: 'candidates', label: t('reports.srcCandidates') },
+    { table: 'time_off_requests', label: t('nav.timeoff') },
+    { table: 'checklist_tasks', label: t('nav.onboarding') },
+    { table: 'kb_articles', label: t('nav.knowledge_base') },
+    { table: 'archives', label: t('nav.archive') },
+    { table: 'timesheets', label: t('nav.timesheet') },
+    { table: 'movements', label: t('nav.movements') },
   ];
+
+  const [modulesToClear, setModulesToClear] = useState<string[]>([]);
+  const [factoryPhrase, setFactoryPhrase] = useState('');
+
+  const toggleModule = (table: string) => {
+    setModulesToClear(prev => (prev.includes(table) ? prev.filter(x => x !== table) : [...prev, table]));
+  };
+
+  const handleClearModules = async () => {
+    if (modulesToClear.length === 0) return;
+    if (!window.confirm(t('settings.security.clearConfirm'))) return;
+    try {
+      const result = await api.resetTables(resetPassword, modulesToClear);
+      await fetchAll();
+      setModulesToClear([]);
+      alert(t('settings.security.cleared', { n: result.cleared.length }));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : t('settings.security.resetError'));
+    }
+  };
+
+  const FACTORY_PHRASE = t('settings.security.factoryPhraseWord');
+
+  const handleFactoryReset = async () => {
+    // Две ступени подтверждения: пароль владельца и точная фраза. Ошибиться
+    // случайно здесь стоит слишком дорого.
+    if (factoryPhrase.trim() !== FACTORY_PHRASE) {
+      alert(t('settings.security.factoryPhraseWrong', { phrase: FACTORY_PHRASE }));
+      return;
+    }
+    if (!window.confirm(t('settings.security.backupFirst'))) return;
+    if (!window.confirm(t('settings.security.resetConfirm'))) return;
+
+    try {
+      await api.resetSystem(resetPassword);
+      localStorage.removeItem('hr-docs-local-db');
+      localStorage.removeItem('hr-docs-app-storage');
+      alert(t('settings.security.resetSuccess'));
+      window.location.reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : t('settings.security.resetError'));
+    }
+  };
+
+  // Резервное копирование. Список ниже — журнал выгрузок, а не хранилище
+  // файлов: браузеру негде держать копии, поэтому сам файл сохраняется у
+  // пользователя, а приложение помнит, что и когда выгружалось.
+  const [backupBusy, setBackupBusy] = useState(false);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCreateBackup = async () => {
+    setBackupBusy(true);
+    try {
+      const payload = await api.exportBackup();
+      const rows = Object.values(payload.data).reduce((sum, list) => sum + list.length, 0);
+      const fileName = `hrdesk-backup-${payload.createdAt.slice(0, 19).replace(/[:T]/g, '-')}.json`;
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      await createIn<BackupEntry>(TABLES.backups, {
+        createdAt: payload.createdAt,
+        fileName,
+        rows,
+      });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : t('settings.backup.failed'));
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const handleRestoreFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (restoreInputRef.current) restoreInputRef.current.value = '';
+    if (!file) return;
+
+    let payload: unknown;
+    try {
+      payload = JSON.parse(await file.text());
+    } catch {
+      alert(t('settings.backup.badFile'));
+      return;
+    }
+
+    // Восстановление затирает текущие данные — спрашиваем прямо.
+    if (!window.confirm(t('settings.backup.restoreConfirm'))) return;
+
+    setBackupBusy(true);
+    try {
+      const result = await api.restoreBackup(payload);
+      await fetchAll();
+      alert(t('settings.backup.restored', { n: result.restored }));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t('settings.backup.failed'));
+    } finally {
+      setBackupBusy(false);
+    }
+  };
 
   const tabs = [
     { id: 'general', icon: SettingsIcon, label: t('settings.tabs.general') },
@@ -366,7 +477,24 @@ export default function Settings() {
                   <h3 className="text-lg font-medium text-rose-500">{t('settings.security.resetTitle')}</h3>
                 </div>
                 <p className="text-sm text-muted mb-6">{t('settings.security.resetHint')}</p>
-                <div className="space-y-4 max-w-xl">
+
+                <div className="space-y-6 max-w-2xl">
+                  {/* Ступень 1-2: настройки. Данные не затрагиваются, пароль не нужен. */}
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={() => { resetAppearance(); logSetting('reset', 'appearance'); }}
+                      className="bg-surface-3 hover:bg-surface-hover border border-line text-secondary px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                    >
+                      {t('settings.security.resetAppearance')}
+                    </button>
+                    <button
+                      onClick={() => { resetSettings(); logSetting('reset', 'settings'); }}
+                      className="bg-surface-3 hover:bg-surface-hover border border-line text-secondary px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                    >
+                      {t('settings.security.resetSettings')}
+                    </button>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium mb-2 text-rose-400/80">{t('settings.security.adminPassword')}</label>
                     <input
@@ -376,24 +504,51 @@ export default function Settings() {
                       placeholder={t('settings.security.adminPasswordPlaceholder')}
                       className="w-full bg-input border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-primary"
                     />
+                    <p className="text-xs text-muted mt-2">{t('settings.security.passwordNeeded')}</p>
                   </div>
+
+                  {/* Ступень 3: данные выбранных модулей. */}
+                  <div className="border-t border-line pt-6">
+                    <h4 className="text-sm font-semibold text-primary mb-3">{t('settings.security.clearModules')}</h4>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {MODULE_TABLES.map(({ table, label }) => (
+                        <button
+                          key={table}
+                          onClick={() => toggleModule(table)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${modulesToClear.includes(table) ? 'bg-rose-500/20 text-rose-400 border-rose-500/40' : 'bg-surface-3 text-muted border-line hover:bg-surface-hover'}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={handleClearModules}
+                      disabled={modulesToClear.length === 0 || !resetPassword}
+                      className="bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20 disabled:opacity-50 px-6 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                    >
+                      {t('settings.security.clearBtn')}
+                    </button>
+                  </div>
+
+                  {/* Ступень 4: полный сброс. Пароль + фраза + предложение бэкапа. */}
+                  <div className="border-t border-line pt-6">
+                    <h4 className="text-sm font-semibold text-rose-500 mb-3">{t('settings.security.factoryTitle')}</h4>
+                    <p className="text-xs text-muted mb-3">{t('settings.security.factoryHint', { phrase: FACTORY_PHRASE })}</p>
+                    <input
+                      type="text"
+                      value={factoryPhrase}
+                      onChange={(e) => setFactoryPhrase(e.target.value)}
+                      placeholder={FACTORY_PHRASE}
+                      className="w-full bg-input border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-primary mb-4"
+                    />
                   <button
-                    onClick={async () => {
-                      if (!window.confirm(t('settings.security.resetConfirm'))) return;
-                      try {
-                        await api.resetSystem(resetPassword);
-                        localStorage.removeItem('hr-docs-local-db');
-                        localStorage.removeItem('hr-docs-app-storage');
-                        alert(t('settings.security.resetSuccess'));
-                        window.location.reload();
-                      } catch (e) {
-                        alert(e instanceof Error ? e.message : t('settings.security.resetError'));
-                      }
-                    }}
-                    className="bg-rose-500/20 text-rose-500 border border-rose-500/30 hover:bg-rose-500/30 px-6 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                    onClick={handleFactoryReset}
+                    disabled={!resetPassword || factoryPhrase.trim() !== FACTORY_PHRASE}
+                    className="bg-rose-500/20 text-rose-500 border border-rose-500/30 hover:bg-rose-500/30 disabled:opacity-50 px-6 py-2.5 rounded-xl text-sm font-medium transition-colors"
                   >
                     {t('settings.security.resetBtn')}
                   </button>
+                  </div>
                 </div>
               </div>
 
@@ -505,9 +660,29 @@ export default function Settings() {
                   </div>
                   <p className="text-sm text-muted">{t('settings.backup.autoInfo')} <span className="bg-surface-3 px-1.5 py-0.5 rounded text-secondary text-xs">/app/backups</span></p>
                 </div>
-                <button className="bg-accent-500 hover:bg-accent-600 text-white px-6 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 text-sm flex-shrink-0">
-                  <span className="w-0 h-0 border-t-4 border-b-4 border-l-[6px] border-transparent border-l-white"></span> {t('settings.backup.createNow')}
-                </button>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    ref={restoreInputRef}
+                    onChange={handleRestoreFile}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => restoreInputRef.current?.click()}
+                    disabled={backupBusy}
+                    className="bg-surface-3 hover:bg-surface-hover border border-line text-secondary px-6 py-2.5 rounded-xl font-medium transition-colors text-sm disabled:opacity-50"
+                  >
+                    {t('settings.backup.restore')}
+                  </button>
+                  <button
+                    onClick={handleCreateBackup}
+                    disabled={backupBusy}
+                    className="bg-accent-500 hover:bg-accent-600 text-white px-6 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                  >
+                    <Download className="w-4 h-4" /> {t('settings.backup.createNow')}
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -525,23 +700,34 @@ export default function Settings() {
                     <thead className="text-table text-secondary bg-surface border-b border-line">
                       <tr>
                         <th className="p-table text-table font-medium">{t('settings.backup.file')}</th>
-                        <th className="p-table text-table font-medium">{t('settings.backup.size')}</th>
+                        <th className="p-table text-table font-medium">{t('settings.backup.rowsCol')}</th>
                         <th className="p-table text-table font-medium">{t('settings.backup.created')}</th>
                         <th className="p-table font-medium text-right">{t('settings.backup.actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {mockBackups.map(b => (
+                      {backups.map(b => (
                         <tr key={b.id} className="border-b border-line hover:bg-surface-hover">
-                          <td className="p-table text-accent-400">{b.file}</td>
-                          <td className="p-table text-table">{b.size}</td>
-                          <td className="p-table text-table">{b.created}</td>
-                          <td className="p-table text-right space-x-3">
-                            <button className="text-accent-400 hover:text-accent-300">{t('settings.backup.download')}</button>
-                            <button className="text-rose-400 hover:text-rose-300">{t('common.delete')}</button>
+                          <td className="p-table text-accent-400">{b.fileName}</td>
+                          <td className="p-table text-table">{t('settings.backup.rows', { n: b.rows })}</td>
+                          <td className="p-table text-table">{b.createdAt.replace('T', ' ').slice(0, 19)}</td>
+                          <td className="p-table text-right">
+                            <button
+                              onClick={() => removeFrom(TABLES.backups, b.id)}
+                              className="text-rose-400 hover:text-rose-300"
+                            >
+                              {t('common.delete')}
+                            </button>
                           </td>
                         </tr>
                       ))}
+                      {backups.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="p-table text-table text-center text-muted py-8">
+                            {t('settings.backup.empty')}
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>

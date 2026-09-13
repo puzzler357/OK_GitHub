@@ -18,6 +18,72 @@ beforeAll(async () => {
 });
 afterAll(stopApi);
 
+describe('резервное копирование', () => {
+  it('копия содержит таблицы данных и не содержит учётных записей', async () => {
+    const { status, body } = await api('GET', '/api/backup');
+
+    expect(status).toBe(200);
+    expect(body.version).toBe(1);
+    expect(Array.isArray(body.data.employees)).toBe(true);
+    expect(body.data.employees.length).toBeGreaterThan(0);
+    // users в копию не входит: восстановление чужой копии подменило бы пароль.
+    expect(body.data.users).toBeUndefined();
+  });
+
+  it('восстановление возвращает данные, удалённые после снятия копии', async () => {
+    const backup = (await api('GET', '/api/backup')).body;
+    const before = (await api('GET', '/api/employees')).body.length;
+
+    const created = await api('POST', '/api/employees', {
+      fullName: 'Лишний Сотрудник', position: 'QA', department: 'IT', status: 'active', hireDate: '2026-05-01',
+    });
+    expect((await api('GET', '/api/employees')).body.length).toBe(before + 1);
+
+    const restored = await api('POST', '/api/backup/restore', backup);
+    expect(restored.status).toBe(200);
+
+    const after = (await api('GET', '/api/employees')).body;
+    expect(after.length).toBe(before);
+    expect(after.find((e: any) => e.id === created.body.id)).toBeUndefined();
+  });
+
+  it('отклоняет файл, не похожий на копию', async () => {
+    expect((await api('POST', '/api/backup/restore', { что: 'попало' })).status).toBe(400);
+    expect((await api('POST', '/api/backup/restore', { data: { неизвестно: [] } })).status).toBe(400);
+  });
+});
+
+describe('очистка отдельных модулей', () => {
+  it('чистит только выбранные таблицы и требует пароль', async () => {
+    expect((await api('POST', '/api/reset/tables', { adminPassword: 'wrong', tables: ['candidates'] })).status).toBe(401);
+
+    const employeesBefore = (await api('GET', '/api/employees')).body.length;
+    expect((await api('GET', '/api/candidates')).body.length).toBeGreaterThan(0);
+
+    const { status, body } = await api('POST', '/api/reset/tables', {
+      adminPassword: PASSWORD,
+      tables: ['candidates', 'неизвестная_таблица'],
+    });
+    expect(status).toBe(200);
+    expect(body.cleared).toEqual(['candidates']);
+
+    expect((await api('GET', '/api/candidates')).body).toEqual([]);
+    // Соседние таблицы не тронуты — в этом весь смысл выборочной очистки.
+    expect((await api('GET', '/api/employees')).body.length).toBe(employeesBefore);
+
+    // Возвращаем строку: следующий тест проверяет, что полный сброс чистит
+    // непустые таблицы, и пустая candidates обесценила бы проверку.
+    await api('POST', '/api/candidates', {
+      fullName: 'Кандидат После Очистки', position: 'QA', status: 'new', createdAt: '2026-05-01',
+    });
+  });
+
+  it('отклоняет запрос без известных таблиц', async () => {
+    const { status } = await api('POST', '/api/reset/tables', { adminPassword: PASSWORD, tables: ['users'] });
+    expect(status).toBe(400);
+  });
+});
+
 describe('POST /api/auth/reset-system', () => {
   it('не чистит базу при неверном пароле администратора', async () => {
     const before = (await api('GET', '/api/employees')).body.length;

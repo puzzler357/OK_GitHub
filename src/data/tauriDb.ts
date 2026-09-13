@@ -7,7 +7,7 @@ import type {
   Employee, Department, Position, TimesheetRecord, ArchiveRecord, ArchiveFilters, Template, LoginResult,
 } from './types';
 import {
-  ENTITIES, ENTITY_BY_TABLE, AUDIT_TABLE, allSchemaSql, insertSql, selectSql, updateSql, rowToObject, objectToValues,
+  ENTITIES, ENTITY_BY_TABLE, AUDIT_TABLE, BACKUP_TABLES, allSchemaSql, insertSql, selectSql, updateSql, rowToObject, objectToValues,
 } from './entities';
 import { seedValues } from './seedData';
 import { employeePatchFor, employeeUpdate } from './movements';
@@ -476,6 +476,82 @@ export async function applyMovement(movement: any): Promise<{ id: string; moveme
 
   await audit(db, 'movement', 'employees', movement.employeeId, `${movement.type} · ${movement.date}`);
   return { id, movement: { ...record, id }, employeePatch: patch };
+}
+
+/** Очистка выбранных таблиц — очистка данных отдельных модулей. */
+export async function resetTables(adminPassword: string, tables: string[]): Promise<{ cleared: string[] }> {
+  const db = await getDb();
+  const rows = await db.select<any[]>("SELECT * FROM users WHERE role = 'ADMIN'");
+  const admin = rows[0];
+  if (!admin || !bcrypt.compareSync(adminPassword, admin.password_hash)) {
+    throw new Error('Неверный пароль администратора');
+  }
+
+  const requested = tables.filter((t) => BACKUP_TABLES.includes(t));
+  if (requested.length === 0) throw new Error('Не выбрано ни одной известной таблицы');
+
+  await db.execute('BEGIN TRANSACTION');
+  try {
+    for (const table of requested) await db.execute(`DELETE FROM ${table}`);
+    await db.execute('COMMIT');
+  } catch (e) {
+    await db.execute('ROLLBACK');
+    throw e;
+  }
+
+  await audit(db, 'reset_tables', 'system', null, requested.join(', '));
+  return { cleared: requested };
+}
+
+// ---- Резервные копии ----
+export async function exportBackup(): Promise<{ version: number; createdAt: string; data: Record<string, unknown[]> }> {
+  const db = await getDb();
+  const data: Record<string, unknown[]> = {};
+  for (const table of BACKUP_TABLES) {
+    data[table] = await db.select<any[]>(`SELECT * FROM ${table}`);
+  }
+  await audit(db, 'backup', 'system', null, `${BACKUP_TABLES.length}`);
+  return { version: 1, createdAt: new Date().toISOString(), data };
+}
+
+export async function restoreBackup(payload: any): Promise<{ restored: number; tables: number }> {
+  if (!payload || typeof payload.data !== 'object' || payload.data === null) {
+    throw new Error('Файл не похож на резервную копию');
+  }
+
+  const tables = BACKUP_TABLES.filter((table) => Array.isArray(payload.data[table]));
+  if (tables.length === 0) throw new Error('В копии нет ни одной известной таблицы');
+
+  const db = await getDb();
+  let restored = 0;
+
+  await db.execute('BEGIN TRANSACTION');
+  try {
+    for (const table of tables) {
+      await db.execute(`DELETE FROM ${table}`);
+
+      const rows = payload.data[table] as Record<string, unknown>[];
+      if (rows.length === 0) continue;
+
+      const info = await db.select<{ name: string }[]>(`PRAGMA table_info(${table})`);
+      const known = new Set(info.map((c) => c.name));
+      const columns = Object.keys(rows[0]).filter((c) => known.has(c));
+      if (columns.length === 0) continue;
+
+      const sql = `INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES (${columns.map((_, i) => `$${i + 1}`).join(', ')})`;
+      for (const row of rows) {
+        await db.execute(sql, columns.map((c) => row[c] ?? null));
+        restored += 1;
+      }
+    }
+    await db.execute('COMMIT');
+  } catch (e) {
+    await db.execute('ROLLBACK');
+    throw e;
+  }
+
+  await audit(db, 'restore', 'system', null, `${restored}`);
+  return { restored, tables: tables.length };
 }
 
 // ---- Auth (локальная, без JWT) ----

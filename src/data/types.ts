@@ -164,6 +164,15 @@ export interface ReportPreset {
   config: string;
 }
 
+/** Запись журнала резервных копий: что и когда выгружали. */
+export interface BackupEntry {
+  id: string;
+  createdAt: string;
+  fileName: string;
+  rows: number;
+  note?: string;
+}
+
 export interface KbCategory {
   id: string;
   name: string;

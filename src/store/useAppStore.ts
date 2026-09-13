@@ -61,6 +61,11 @@ interface AppState {
   setLockTimeoutMinutes: (minutes: number) => void;
   lock: () => void;
   unlock: () => void;
+
+  /** Сброс оформления к значениям по умолчанию (тема, акцент, плотность, шрифт). */
+  resetAppearance: () => void;
+  /** Сброс всех настроек приложения к заводским. Данные не трогает. */
+  resetSettings: () => void;
   setTheme: (theme: Theme) => void;
   setAccentColor: (color: AccentColor) => void;
   setDensity: (density: Density) => void;
@@ -73,6 +78,31 @@ interface AppState {
 
 // Приложение однопользовательское: единственная роль — владелец устройства.
 export type Role = 'ADMIN';
+
+// Значения по умолчанию вынесены, чтобы сброс настроек иинициализация
+// стора не разъезжались.
+const APPEARANCE_DEFAULTS = {
+  theme: 'dark' as Theme,
+  accentColor: 'indigo' as AccentColor,
+  density: 'standard' as Density,
+  fontSize: 'standard' as FontSize,
+};
+
+const SETTINGS_DEFAULTS = {
+  language: 'ru',
+  sidebarOpen: true,
+  currencySymbol: DEFAULT_CURRENCY.currencySymbol,
+  currencyPosition: DEFAULT_CURRENCY.currencyPosition,
+  currencyDecimals: DEFAULT_CURRENCY.currencyDecimals,
+  thousandsSeparator: DEFAULT_CURRENCY.thousandsSeparator,
+  docxTemplatePath: '/templates/blank.docx',
+  orgName: 'HRDesk',
+  orgInn: '',
+  orgDirector: '',
+  dateFormat: 'dd.MM.yyyy' as DateFormat,
+  startScreen: '/dashboard',
+  lockTimeoutMinutes: 15,
+};
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -116,6 +146,25 @@ export const useAppStore = create<AppState>()(
       setLockTimeoutMinutes: (lockTimeoutMinutes) => set({ lockTimeoutMinutes }),
       lock: () => set({ locked: true }),
       unlock: () => set({ locked: false }),
+
+      resetAppearance: () => {
+        set(APPEARANCE_DEFAULTS);
+        applyTheme(APPEARANCE_DEFAULTS.theme);
+        applyAccentColor(APPEARANCE_DEFAULTS.accentColor);
+        applyDensity(APPEARANCE_DEFAULTS.density);
+        applyFontSize(APPEARANCE_DEFAULTS.fontSize);
+      },
+
+      resetSettings: () => {
+        // Сессия и блокировка сюда не входят: сброс настроек не должен
+        // ни разлогинивать владельца, ни снимать блокировку.
+        set({ ...APPEARANCE_DEFAULTS, ...SETTINGS_DEFAULTS });
+        applyTheme(APPEARANCE_DEFAULTS.theme);
+        applyAccentColor(APPEARANCE_DEFAULTS.accentColor);
+        applyDensity(APPEARANCE_DEFAULTS.density);
+        applyFontSize(APPEARANCE_DEFAULTS.fontSize);
+        i18n.changeLanguage(SETTINGS_DEFAULTS.language);
+      },
       setTheme: (theme) => {
         set({ theme });
         applyTheme(theme);

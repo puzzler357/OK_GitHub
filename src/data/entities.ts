@@ -175,6 +175,19 @@ export const ENTITIES: EntityDef[] = [
     ],
   },
   {
+    table: 'backups',
+    stateKey: 'backups',
+    route: 'backups',
+    selfFilling: true,
+    orderBy: 'created_at DESC',
+    columns: [
+      text('createdAt', 'created_at'),
+      text('fileName', 'file_name'),
+      int('rows', 'rows'),
+      text('note', 'note', false),
+    ],
+  },
+  {
     table: 'kb_categories',
     stateKey: 'kbCategories',
     route: 'kb-categories',
@@ -205,6 +218,18 @@ export const ENTITY_BY_TABLE = new Map(ENTITIES.map((e) => [e.table, e]));
 /** Таблица журнала: её изменения в журнал не пишутся, иначе он зациклится. */
 export const AUDIT_TABLE = 'audit_log';
 
+/**
+ * Таблицы, попадающие в резервную копию.
+ *
+ * users намеренно не входит: учётная запись владельца привязана к устройству,
+ * и восстановление копии с чужого компьютера подменило бы пароль. backups —
+ * журнал самих копий, восстанавливать его поверх себя бессмысленно.
+ */
+export const BACKUP_TABLES = [
+  'employees', 'departments', 'positions', 'templates', 'timesheets', 'archives',
+  ...ENTITIES.filter((e) => e.table !== 'backups').map((e) => e.table),
+];
+
 /** Сущности, которым положен посев. */
 export const SEEDED_ENTITIES = ENTITIES.filter((e) => !e.selfFilling);
 
@@ -218,6 +243,7 @@ export const TABLES = {
   movements: 'movements',
   auditLog: 'audit_log',
   reportPresets: 'report_presets',
+  backups: 'backups',
   kbCategories: 'kb_categories',
   kbArticles: 'kb_articles',
 } as const;

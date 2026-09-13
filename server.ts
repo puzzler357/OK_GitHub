@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { createServer as createViteServer } from 'vite';
 import db, { RESETTABLE_TABLES } from './src/db/sqlite';
-import { ENTITIES, ENTITY_BY_TABLE, AUDIT_TABLE, insertSql, selectSql, updateSql, rowToObject, objectToValues } from './src/data/entities';
+import { ENTITIES, ENTITY_BY_TABLE, AUDIT_TABLE, BACKUP_TABLES, insertSql, selectSql, updateSql, rowToObject, objectToValues } from './src/data/entities';
 import { employeePatchFor, employeeUpdate } from './src/data/movements';
 
 export const app = express();
@@ -177,6 +177,84 @@ app.post('/api/movements/apply', (req, res) => {
 
   audit('movement', 'employees', movement.employeeId, `${movement.type} · ${movement.date}`);
   res.json({ id, movement: { ...record, id }, employeePatch: patch });
+});
+
+// Очистка данных отдельных модулей. Отличается от полного сброса тем, что
+// трогает только выбранные таблицы и не затрагивает настройки.
+app.post('/api/reset/tables', (req, res) => {
+  const { adminPassword, tables } = req.body ?? {};
+
+  const admin = db.prepare('SELECT * FROM users WHERE role = ?').get('ADMIN') as any;
+  if (!admin || !bcrypt.compareSync(adminPassword, admin.password_hash)) {
+    return res.status(401).json({ error: 'Неверный пароль администратора' });
+  }
+
+  const requested = Array.isArray(tables) ? tables.filter((t: string) => BACKUP_TABLES.includes(t)) : [];
+  if (requested.length === 0) return res.status(400).json({ error: 'Не выбрано ни одной известной таблицы' });
+
+  db.transaction(() => {
+    for (const table of requested) db.prepare(`DELETE FROM ${table}`).run();
+  })();
+
+  audit('reset_tables', 'system', null, requested.join(', '));
+  res.json({ cleared: requested });
+});
+
+// Резервная копия — снимок таблиц данных в виде JSON. Формат намеренно
+// простой: колонки как есть, чтобы копию можно было прочитать и починить
+// руками, не разбирая формат SQLite.
+app.get('/api/backup', (_req, res) => {
+  const data: Record<string, unknown[]> = {};
+  for (const table of BACKUP_TABLES) {
+    data[table] = db.prepare(`SELECT * FROM ${table}`).all();
+  }
+  audit('backup', 'system', null, `${BACKUP_TABLES.length}`);
+  res.json({ version: 1, createdAt: new Date().toISOString(), data });
+});
+
+app.post('/api/backup/restore', (req, res) => {
+  const payload = req.body;
+  if (!payload || typeof payload !== 'object' || typeof payload.data !== 'object' || payload.data === null) {
+    return res.status(400).json({ error: 'Файл не похож на резервную копию' });
+  }
+
+  // Восстанавливаем только известные таблицы: лишние ключи в файле молча
+  // игнорируем, но и данные из них не подсовываем в базу.
+  const tables = BACKUP_TABLES.filter((table) => Array.isArray(payload.data[table]));
+  if (tables.length === 0) {
+    return res.status(400).json({ error: 'В копии нет ни одной известной таблицы' });
+  }
+
+  let restored = 0;
+  try {
+    db.transaction(() => {
+      for (const table of tables) {
+        db.prepare(`DELETE FROM ${table}`).run();
+
+        const rows = payload.data[table] as Record<string, unknown>[];
+        if (rows.length === 0) continue;
+
+        // Пишем по колонкам самой строки, но только тем, что есть в схеме:
+        // копия из другой версии не должна ронять восстановление целиком.
+        const known = new Set((db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name));
+        const columns = Object.keys(rows[0]).filter((c) => known.has(c));
+        if (columns.length === 0) continue;
+
+        const stmt = db.prepare(
+          `INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
+        );
+        for (const row of rows) {
+          stmt.run(...columns.map((c) => row[c] ?? null));
+          restored += 1;
+        }
+      }
+    })();
+  } catch (e) {
+    return res.status(400).json({ error: e instanceof Error ? e.message : 'Не удалось восстановить копию' });
+  }
+
+  audit('restore', 'system', null, `${restored}`);
+  res.json({ restored, tables: tables.length });
 });
 
 // API Employees
