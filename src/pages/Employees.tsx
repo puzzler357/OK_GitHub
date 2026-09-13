@@ -1,41 +1,77 @@
-import React, { useState, useRef } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { 
-  createColumnHelper, 
-  flexRender, 
-  getCoreRowModel, 
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
   useReactTable,
   getSortedRowModel,
-  SortingState
+  getFilteredRowModel,
+  SortingState,
+  ColumnFiltersState,
+  FilterFn,
 } from '@tanstack/react-table';
-import { Search, ChevronDown, ChevronUp, MoreHorizontal, UserPlus, Download, Upload } from 'lucide-react';
+import { ChevronDown, ChevronUp, Upload } from 'lucide-react';
 import EmployeeForm from '../components/EmployeeForm';
 import EmployeeActions from '../components/EmployeeActions';
 import { exportToExcel, parseExcel } from '../lib/excel';
-
-type Employee = {
-  id: string;
-  fullName: string;
-  position: string;
-  department: string;
-  status: 'active' | 'on_leave' | 'probation';
-  hireDate: string;
-  paymentType?: 'salary' | 'hourly' | 'piecework';
-  salary?: number;
-  rate?: number;
-};
-
+import { useMoney } from '../lib/money';
 import { useDatabaseStore } from '../store/useDatabaseStore';
+import type { Employee } from '../store/useDatabaseStore';
 
 const columnHelper = createColumnHelper<Employee>();
 
+type RateFilter = 'all' | 'full' | 'partial' | 'extended';
+
+// Ставка сравнивается по диапазону, а не по равенству: строгое совпадение
+// с 0.5 или 0.25 отсекало бы всё остальное неполное.
+const rateFilterFn: FilterFn<Employee> = (row, columnId, value) => {
+  if (value === 'all') return true;
+  const rate = (row.getValue(columnId) as number | undefined) ?? 1;
+  if (value === 'full') return rate === 1;
+  if (value === 'partial') return rate < 1;
+  if (value === 'extended') return rate > 1;
+  return true;
+};
+
 export default function Employees() {
   const { t } = useTranslation();
-  const { employees: data, addEmployee, setEmployees } = useDatabaseStore();
+  const { employees: data, departments, addEmployee, importEmployees } = useDatabaseStore();
+  const money = useMoney();
+
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [rateFilter, setRateFilter] = useState<RateFilter>('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Опции берём из справочника подразделений, а не из строк сотрудников:
+  // иначе пустое подразделение в списке не появится.
+  const departmentOptions = useMemo(() => {
+    const fromCatalog = departments.map((d) => d.name);
+    const fromEmployees = data.map((e) => e.department);
+    return Array.from(new Set([...fromCatalog, ...fromEmployees])).filter(Boolean).sort();
+  }, [departments, data]);
+
+  const columnFilters = useMemo<ColumnFiltersState>(() => {
+    const filters: ColumnFiltersState = [];
+    if (departmentFilter !== 'all') filters.push({ id: 'department', value: departmentFilter });
+    if (statusFilter !== 'all') filters.push({ id: 'status', value: statusFilter });
+    if (rateFilter !== 'all') filters.push({ id: 'rate', value: rateFilter });
+    return filters;
+  }, [departmentFilter, statusFilter, rateFilter]);
+
+  const resetFilters = () => {
+    setGlobalFilter('');
+    setDepartmentFilter('all');
+    setStatusFilter('all');
+    setRateFilter('all');
+  };
+
+  const filtersActive =
+    globalFilter !== '' || departmentFilter !== 'all' || statusFilter !== 'all' || rateFilter !== 'all';
 
   const handleAddEmployee = (newEmployee: any) => {
     addEmployee(newEmployee);
@@ -49,37 +85,48 @@ export default function Employees() {
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
+    let rows: Omit<Employee, 'id'>[];
     try {
       const parsedData = await parseExcel(file);
-      const mapped = parsedData.map((row: any) => ({
-        id: Math.random().toString(),
+      rows = parsedData.map((row: any) => ({
         fullName: row['ФИО'] || row['fullName'] || 'Unknown',
         position: row['Должность'] || row['position'] || 'Unknown',
         department: row['Подразделение'] || row['department'] || 'Unknown',
         status: (row['Статус'] || row['status'] || 'active') as Employee['status'],
         hireDate: row['Дата приема'] || row['hireDate'] || new Date().toISOString().split('T')[0],
+        tabNumber: row['Таб. номер'] || row['tabNumber'] || undefined,
       }));
-      setEmployees([...data, ...mapped]);
     } catch (err) {
       console.error('Failed to parse excel:', err);
       alert(t('employees.readError'));
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
     }
-    
+
+    try {
+      // Пишем в БД, а не только в стор: иначе импортированные строки
+      // исчезали при первом же обновлении списка.
+      const created = await importEmployees(rows);
+      alert(t('employees.importDone', { n: created }));
+    } catch (err) {
+      console.error('Failed to import employees:', err);
+      alert(t('employees.importFailed'));
+    }
+
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     columnHelper.accessor('fullName', {
       header: t('employees.col.fullName'),
       cell: info => <span className="font-medium text-primary dark:text-slate-100">{info.getValue()}</span>,
     }),
-    columnHelper.display({
-      id: 'tabNumber',
+    columnHelper.accessor('tabNumber', {
       header: t('employees.col.tabNumber'),
-      cell: info => <span className="text-muted">{(Math.random() * 10000).toFixed(0).padStart(4, '0')}</span>,
+      cell: info => <span className="text-muted tabular-nums">{info.getValue() || '—'}</span>,
     }),
 
     columnHelper.accessor('salary', {
@@ -87,11 +134,12 @@ export default function Employees() {
       cell: info => {
         const val = info.getValue();
         if (val == null) return <span className="text-muted">—</span>;
-        return <span>{val.toLocaleString('ru-RU')} ₽</span>;
+        return <span className="tabular-nums">{money.format(val)}</span>;
       },
     }),
     columnHelper.accessor('rate', {
       header: t('employees.col.rate'),
+      filterFn: rateFilterFn,
       cell: info => {
         const val = info.getValue() || 1;
         return <span>{val * 100}%</span>;
@@ -122,7 +170,7 @@ export default function Employees() {
         <EmployeeActions employee={info.row.original} />
       ),
     })
-  ];
+  ], [t, money]);
 
   const table = useReactTable({
     data,
@@ -130,28 +178,37 @@ export default function Employees() {
     state: {
       sorting,
       globalFilter,
+      columnFilters,
     },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
   });
+
+  const shownCount = table.getFilteredRowModel().rows.length;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold tracking-tight">{t('employees.title')} <span className="text-muted text-lg font-normal">({data.length})</span></h2>
+        <h2 className="text-2xl font-semibold tracking-tight">
+          {t('employees.title')}{' '}
+          <span className="text-muted text-lg font-normal">
+            ({filtersActive ? `${shownCount} / ${data.length}` : data.length})
+          </span>
+        </h2>
         <div className="flex items-center gap-3">
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleImport} 
-            accept=".xlsx,.xls" 
-            className="hidden" 
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImport}
+            accept=".xlsx,.xls"
+            className="hidden"
           />
-          <button 
+          <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-[var(--border-color)] hover:bg-surface-hover dark:hover:bg-slate-800 text-secondary dark:text-slate-300 px-4 py-2 rounded-xl font-medium transition-colors shadow-sm hidden"
+            className="flex items-center gap-2 bg-surface-3 border border-line hover:bg-surface-hover text-secondary px-4 py-2 rounded-xl font-medium transition-colors shadow-sm text-sm"
           >
             <Upload className="w-4 h-4" />
             {t('common.import')}
@@ -175,24 +232,49 @@ export default function Employees() {
         <div className="p-4 border-b border-[var(--border-color)] flex items-center gap-4 bg-surface-2 dark:bg-slate-900/50">
           <div className="flex flex-1 items-center gap-3">
             <div className="relative flex-1 max-w-sm">
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={globalFilter ?? ''}
                 onChange={e => setGlobalFilter(e.target.value)}
                 placeholder={t('common.search')}
                 className="w-full px-4 py-2 bg-surface border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 transition-shadow"
               />
             </div>
-            <select className="bg-surface border border-line rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 text-secondary w-40">
-              <option>{t('employees.allDepartments')}</option>
+            <select
+              value={departmentFilter}
+              onChange={e => setDepartmentFilter(e.target.value)}
+              className="bg-surface border border-line rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 text-secondary w-40"
+            >
+              <option value="all">{t('employees.allDepartments')}</option>
+              {departmentOptions.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
             </select>
-            <select className="bg-surface border border-line rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 text-secondary w-40">
-              <option>{t('employees.allStatuses')}</option>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="bg-surface border border-line rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 text-secondary w-40"
+            >
+              <option value="all">{t('employees.allStatuses')}</option>
+              <option value="active">{t('employees.status.active')}</option>
+              <option value="on_leave">{t('employees.status.onLeave')}</option>
+              <option value="probation">{t('employees.status.probation')}</option>
             </select>
-            <select className="bg-surface border border-line rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 text-secondary w-40">
-              <option>{t('employees.anyRate')}</option>
+            <select
+              value={rateFilter}
+              onChange={e => setRateFilter(e.target.value as RateFilter)}
+              className="bg-surface border border-line rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 text-secondary w-40"
+            >
+              <option value="all">{t('employees.anyRate')}</option>
+              <option value="full">{t('employees.rateFull')}</option>
+              <option value="partial">{t('employees.ratePartial')}</option>
+              <option value="extended">{t('employees.rateExtended')}</option>
             </select>
-            <button className="bg-surface-4 hover:bg-surface-hover text-secondary px-4 py-2 rounded-xl text-sm font-medium transition-colors">
+            <button
+              onClick={resetFilters}
+              disabled={!filtersActive}
+              className="bg-surface-4 hover:bg-surface-hover text-secondary px-4 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               {t('common.reset')}
             </button>
           </div>
@@ -205,7 +287,7 @@ export default function Employees() {
             </button>
           </div>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-muted uppercase bg-surface-2 dark:bg-slate-900/50 border-b border-[var(--border-color)]">
@@ -249,7 +331,7 @@ export default function Employees() {
       </div>
 
       {isFormOpen && (
-        <EmployeeForm 
+        <EmployeeForm
           onClose={() => setIsFormOpen(false)}
           onSubmit={handleAddEmployee}
         />

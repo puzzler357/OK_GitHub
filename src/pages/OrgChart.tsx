@@ -2,12 +2,49 @@ import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, Users, Briefcase, Plus, X, Edit, Trash2 } from 'lucide-react';
 import { useDatabaseStore } from '../store/useDatabaseStore';
+import { useMoney } from '../lib/money';
 
 export default function OrgChart() {
   const { t } = useTranslation();
   const { employees, departments, positions } = useDatabaseStore();
+  const money = useMoney();
   
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  // Индекс «родитель -> дети» для рекурсивного обхода. Узлы, чей parentId
+  // указывает в никуда, считаем корневыми: иначе они пропали бы из дерева.
+  const { roots, childrenOf } = useMemo(() => {
+    const known = new Set(departments.map((d) => d.id));
+    const byParent = new Map<string, typeof departments>();
+    const topLevel: typeof departments = [];
+
+    for (const dep of departments) {
+      const parentId = dep.parentId;
+      if (!parentId || !known.has(parentId)) {
+        topLevel.push(dep);
+        continue;
+      }
+      const siblings = byParent.get(parentId);
+      if (siblings) siblings.push(dep);
+      else byParent.set(parentId, [dep]);
+    }
+
+    return {
+      roots: topLevel,
+      childrenOf: (id: string) => byParent.get(id) ?? [],
+    };
+  }, [departments]);
+
+  const toggleCollapsed = (id: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   
   // Modals state
   const [isDepModalOpen, setIsDepModalOpen] = useState(false);
@@ -71,6 +108,42 @@ export default function OrgChart() {
   const totalOccupied = positionStats.reduce((sum, p) => sum + p.occupied, 0);
   const totalVacant = totalPositions - totalOccupied;
 
+  // Рекурсивный рендер: раньше здесь был плоский список с условием
+  // `d.parentId === 'd1' || d.parentId !== null`, пропускавшим любой узел
+  // с непустым родителем, из-за чего вложенность не отрисовывалась вовсе.
+  const renderNode = (dep: (typeof departments)[number], depth: number) => {
+    const children = childrenOf(dep.id);
+    const hasChildren = children.length > 0;
+    const isOpen = hasChildren && !collapsed.has(dep.id);
+    const isSelected = selectedDepartment === dep.id;
+
+    return (
+      <div key={dep.id}>
+        <div
+          onClick={() => setSelectedDepartment(dep.id)}
+          style={{ paddingLeft: `${depth * 16 + 8}px` }}
+          className={`flex items-center gap-2 py-2 pr-2 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400' : 'hover:bg-surface-hover dark:hover:bg-slate-800 text-secondary dark:text-slate-300'}`}
+        >
+          {hasChildren ? (
+            <button
+              type="button"
+              aria-label={dep.name}
+              onClick={(e) => { e.stopPropagation(); toggleCollapsed(dep.id); }}
+              className="p-0.5 rounded hover:bg-surface-hover transition-colors flex-shrink-0"
+            >
+              <ChevronRight className={`w-4 h-4 transform transition-transform ${isOpen ? 'rotate-90' : ''} ${isSelected ? 'text-accent-500' : ''}`} />
+            </button>
+          ) : (
+            <span className="w-5 flex-shrink-0" />
+          )}
+          <Users className={`w-4 h-4 flex-shrink-0 ${isSelected ? 'text-accent-500' : ''}`} />
+          <span className="text-sm truncate">{dep.name}</span>
+        </div>
+        {isOpen && children.map((child) => renderNode(child, depth + 1))}
+      </div>
+    );
+  };
+
   return (
     <>
     <div className="space-y-6">
@@ -99,18 +172,8 @@ export default function OrgChart() {
               <span className="font-medium text-sm">{t('profile.company')} ({t('orgchart.all')})</span>
             </div>
             
-            <div className="pl-6 space-y-1">
-              {departments.filter(d => d.parentId === 'd1' || d.parentId !== null).map((dep, i) => (
-                <div 
-                  key={i} 
-                  onClick={() => setSelectedDepartment(dep.id)}
-                  className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${selectedDepartment === dep.id ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400' : 'hover:bg-surface-hover dark:hover:bg-slate-800 text-secondary dark:text-slate-300'}`}
-                >
-                  <ChevronRight className={`w-4 h-4 transform ${selectedDepartment === dep.id ? 'rotate-90 text-accent-500' : ''}`} />
-                  <Users className={`w-4 h-4 ${selectedDepartment === dep.id ? 'text-accent-500' : ''}`} />
-                  <span className="text-sm">{dep.name}</span>
-                </div>
-              ))}
+            <div className="space-y-1">
+              {roots.map((dep) => renderNode(dep, 0))}
             </div>
           </div>
         </div>
@@ -201,7 +264,7 @@ export default function OrgChart() {
                         <td className="p-table text-table text-center text-amber-600 dark:text-amber-400">{pos.vacant}</td>
                         <td className="p-table text-table text-right font-medium">{pos.total}</td>
                         <td className="p-table text-table text-right text-muted">
-                          {pos.salary > 0 ? `${pos.salary.toLocaleString()} ₸` : t('orgchart.notSet')}
+                          {pos.salary > 0 ? money.format(pos.salary) : t('orgchart.notSet')}
                         </td>
                       </tr>
                     ))
