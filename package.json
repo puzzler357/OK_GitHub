@@ -17,6 +17,7 @@
     "test:e2e:ui": "playwright test --ui",
     "verify": "npm run lint && npm run build && npm run test && npm run test:e2e",
     "start": "node dist/server.cjs",
+    "seed:load": "tsx scripts/seedLoad.ts",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
@@ -26,6 +27,7 @@
     "@hookform/resolvers": "^5.4.0",
     "@tailwindcss/vite": "^4.1.14",
     "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.14.12",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-sql": "^2.4.0",
     "@tiptap/extension-color": "^3.27.3",

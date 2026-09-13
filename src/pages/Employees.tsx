@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useTranslation } from 'react-i18next';
 import {
   createColumnHelper,
@@ -16,6 +17,7 @@ import EmployeeForm from '../components/EmployeeForm';
 import EmployeeActions from '../components/EmployeeActions';
 import { exportToExcel, parseExcel } from '../lib/excel';
 import { useMoney } from '../lib/money';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 import { useDatabaseStore } from '../store/useDatabaseStore';
 import type { Employee } from '../store/useDatabaseStore';
 
@@ -40,7 +42,10 @@ export default function Employees() {
   const money = useMoney();
 
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = useState('');
+  // В поле пишем сразу, а таблицу пересчитываем с задержкой: фильтрация идёт
+  // по массиву в памяти и на больших объёмах тормозила бы ввод.
+  const [searchInput, setSearchInput] = useState('');
+  const globalFilter = useDebouncedValue(searchInput, 250);
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [rateFilter, setRateFilter] = useState<RateFilter>('all');
@@ -64,14 +69,14 @@ export default function Employees() {
   }, [departmentFilter, statusFilter, rateFilter]);
 
   const resetFilters = () => {
-    setGlobalFilter('');
+    setSearchInput('');
     setDepartmentFilter('all');
     setStatusFilter('all');
     setRateFilter('all');
   };
 
   const filtersActive =
-    globalFilter !== '' || departmentFilter !== 'all' || statusFilter !== 'all' || rateFilter !== 'all';
+    searchInput !== '' || departmentFilter !== 'all' || statusFilter !== 'all' || rateFilter !== 'all';
 
   const handleAddEmployee = (newEmployee: any) => {
     addEmployee(newEmployee);
@@ -181,13 +186,29 @@ export default function Employees() {
       columnFilters,
     },
     onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   });
 
   const shownCount = table.getFilteredRowModel().rows.length;
+
+  // Виртуализация строк: при 10 000 сотрудников в DOM держится десяток
+  // видимых строк вместо всей таблицы. Высота строк постоянная, поэтому
+  // хватает оценки без измерения каждой.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const tableRows = table.getRowModel().rows;
+  const rowVirtualizer = useVirtualizer({
+    count: tableRows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 57,
+    overscan: 12,
+  });
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const paddingBottom = virtualRows.length > 0
+    ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -234,8 +255,8 @@ export default function Employees() {
             <div className="relative flex-1 max-w-sm">
               <input
                 type="text"
-                value={globalFilter ?? ''}
-                onChange={e => setGlobalFilter(e.target.value)}
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
                 placeholder={t('common.search')}
                 className="w-full px-4 py-2 bg-surface border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 transition-shadow"
               />
@@ -288,9 +309,9 @@ export default function Employees() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div ref={scrollRef} className="overflow-auto custom-scrollbar max-h-[calc(100vh-20rem)]">
           <table className="w-full text-sm text-left">
-            <thead className="text-xs text-muted uppercase bg-surface-2 dark:bg-slate-900/50 border-b border-[var(--border-color)]">
+            <thead className="text-xs text-muted uppercase bg-surface-2 dark:bg-slate-900/50 border-b border-[var(--border-color)] sticky top-0 z-10">
               {table.getHeaderGroups().map(headerGroup => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map(header => (
@@ -311,18 +332,23 @@ export default function Employees() {
               ))}
             </thead>
             <tbody>
-              {table.getRowModel().rows.map(row => (
-                <tr key={row.id} className="bg-white dark:bg-slate-950 border-b border-[var(--border-color)] hover:bg-surface-hover dark:hover:bg-slate-900 transition-colors">
-                  {row.getVisibleCells().map(cell => (
-                    <td key={cell.id} className="p-table text-table">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {paddingTop > 0 && <tr style={{ height: paddingTop }} aria-hidden />}
+              {virtualRows.map(virtualRow => {
+                const row = tableRows[virtualRow.index];
+                return (
+                  <tr key={row.id} className="bg-white dark:bg-slate-950 border-b border-[var(--border-color)] hover:bg-surface-hover dark:hover:bg-slate-900 transition-colors">
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id} className="p-table text-table">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+              {paddingBottom > 0 && <tr style={{ height: paddingBottom }} aria-hidden />}
             </tbody>
           </table>
-          {table.getRowModel().rows.length === 0 && (
+          {tableRows.length === 0 && (
             <div className="p-12 text-center text-muted">
               {t('employees.empty')}
             </div>
