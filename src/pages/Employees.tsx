@@ -20,6 +20,7 @@ import { useMoney } from '../lib/money';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
 import { useDatabaseStore } from '../store/useDatabaseStore';
 import type { Employee } from '../store/useDatabaseStore';
+import { useNotify } from '../components/Toasts';
 
 const columnHelper = createColumnHelper<Employee>();
 
@@ -40,6 +41,7 @@ export default function Employees() {
   const { t } = useTranslation();
   const { employees: data, departments, addEmployee, importEmployees } = useDatabaseStore();
   const money = useMoney();
+  const notify = useNotify();
 
   const [sorting, setSorting] = useState<SortingState>([]);
   // В поле пишем сразу, а таблицу пересчитываем с задержкой: фильтрация идёт
@@ -104,7 +106,7 @@ export default function Employees() {
       }));
     } catch (err) {
       console.error('Failed to parse excel:', err);
-      alert(t('employees.readError'));
+      notify.error(t('employees.readError'));
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -113,10 +115,10 @@ export default function Employees() {
       // Пишем в БД, а не только в стор: иначе импортированные строки
       // исчезали при первом же обновлении списка.
       const created = await importEmployees(rows);
-      alert(t('employees.importDone', { n: created }));
+      notify.success(t('employees.importDone', { n: created }));
     } catch (err) {
       console.error('Failed to import employees:', err);
-      alert(t('employees.importFailed'));
+      notify.error(t('employees.importFailed'));
     }
 
     if (fileInputRef.current) {

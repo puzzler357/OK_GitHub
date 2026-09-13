@@ -7,6 +7,7 @@ import type { TemplateValues } from '../lib/templateVars';
 import { FileText, Download, Printer } from 'lucide-react';
 import { generateDocx } from '../lib/docx';
 import { useAppStore } from '../store/useAppStore';
+import { useNotify } from '../components/Toasts';
 
 export default function DocumentGenerator() {
   const { t } = useTranslation();
@@ -14,6 +15,7 @@ export default function DocumentGenerator() {
   const money = useMoney();
   const docxTemplatePath = useAppStore((s) => s.docxTemplatePath);
   const orgName = useAppStore((s) => s.orgName);
+  const notify = useNotify();
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [variables, setVariables] = useState<Record<string, string>>({});
@@ -66,7 +68,7 @@ export default function DocumentGenerator() {
       }, `${template.name}.docx`);
     } catch {
       // generateDocx уже пишет причину в консоль; пользователю нужен факт.
-      alert(t('docgen.docxHint'));
+      notify.error(t('docgen.docxHint'));
     }
   };
 

@@ -10,6 +10,7 @@ import type { CurrencyDecimals, CurrencyPosition, ThousandsSeparator } from '../
 import * as api from '../data';
 import { Settings as SettingsIcon, ShieldCheck, Key, Shield, Database, Link, Palette, Eye, Download, RefreshCw, Check, Sun, Moon, Monitor } from 'lucide-react';
 import { clickable } from '../lib/a11y';
+import { useNotify } from '../components/Toasts';
 
 export default function Settings() {
   const [resetPassword, setResetPassword] = useState('');
@@ -28,6 +29,7 @@ export default function Settings() {
     resetAppearance, resetSettings,
   } = useAppStore();
   const money = useMoney();
+  const notify = useNotify();
   const [activeTab, setActiveTab] = useState('general');
 
   
@@ -97,14 +99,14 @@ export default function Settings() {
 
   const handleClearModules = async () => {
     if (modulesToClear.length === 0) return;
-    if (!window.confirm(t('settings.security.clearConfirm'))) return;
+    if (!(await notify.confirm(t('settings.security.clearConfirm'), { danger: true }))) return;
     try {
       const result = await api.resetTables(resetPassword, modulesToClear);
       await fetchAll();
       setModulesToClear([]);
-      alert(t('settings.security.cleared', { n: result.cleared.length }));
+      notify.success(t('settings.security.cleared', { n: result.cleared.length }));
     } catch (e) {
-      alert(e instanceof Error ? e.message : t('settings.security.resetError'));
+      notify.error(e instanceof Error ? e.message : t('settings.security.resetError'));
     }
   };
 
@@ -114,20 +116,20 @@ export default function Settings() {
     // Две ступени подтверждения: пароль владельца и точная фраза. Ошибиться
     // случайно здесь стоит слишком дорого.
     if (factoryPhrase.trim() !== FACTORY_PHRASE) {
-      alert(t('settings.security.factoryPhraseWrong', { phrase: FACTORY_PHRASE }));
+      notify.error(t('settings.security.factoryPhraseWrong', { phrase: FACTORY_PHRASE }));
       return;
     }
-    if (!window.confirm(t('settings.security.backupFirst'))) return;
-    if (!window.confirm(t('settings.security.resetConfirm'))) return;
+    if (!(await notify.confirm(t('settings.security.backupFirst')))) return;
+    if (!(await notify.confirm(t('settings.security.resetConfirm'), { danger: true }))) return;
 
     try {
       await api.resetSystem(resetPassword);
       localStorage.removeItem('hr-docs-local-db');
       localStorage.removeItem('hr-docs-app-storage');
-      alert(t('settings.security.resetSuccess'));
+      notify.success(t('settings.security.resetSuccess'));
       window.location.reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : t('settings.security.resetError'));
+      notify.error(e instanceof Error ? e.message : t('settings.security.resetError'));
     }
   };
 
@@ -158,7 +160,7 @@ export default function Settings() {
         rows,
       });
     } catch (e) {
-      alert(e instanceof Error ? e.message : t('settings.backup.failed'));
+      notify.error(e instanceof Error ? e.message : t('settings.backup.failed'));
     } finally {
       setBackupBusy(false);
     }
@@ -173,20 +175,20 @@ export default function Settings() {
     try {
       payload = JSON.parse(await file.text());
     } catch {
-      alert(t('settings.backup.badFile'));
+      notify.error(t('settings.backup.badFile'));
       return;
     }
 
     // Восстановление затирает текущие данные — спрашиваем прямо.
-    if (!window.confirm(t('settings.backup.restoreConfirm'))) return;
+    if (!(await notify.confirm(t('settings.backup.restoreConfirm'), { danger: true }))) return;
 
     setBackupBusy(true);
     try {
       const result = await api.restoreBackup(payload);
       await fetchAll();
-      alert(t('settings.backup.restored', { n: result.restored }));
+      notify.success(t('settings.backup.restored', { n: result.restored }));
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('settings.backup.failed'));
+      notify.error(err instanceof Error ? err.message : t('settings.backup.failed'));
     } finally {
       setBackupBusy(false);
     }
@@ -412,21 +414,21 @@ export default function Settings() {
                   </div>
                   <button onClick={async () => {
                     if (newPassword !== confirmPassword) {
-                      alert(t('settings.password.mismatch'));
+                      notify.error(t('settings.password.mismatch'));
                       return;
                     }
                     if (newPassword.length < 6) {
-                      alert(t('settings.password.tooShort'));
+                      notify.error(t('settings.password.tooShort'));
                       return;
                     }
                     try {
                       await api.changePassword(user?.email || '', currentPassword, newPassword);
-                      alert(t('settings.password.success'));
+                      notify.success(t('settings.password.success'));
                       setCurrentPassword('');
                       setNewPassword('');
                       setConfirmPassword('');
                     } catch (e) {
-                      alert(e instanceof Error ? e.message : t('settings.password.error'));
+                      notify.error(e instanceof Error ? e.message : t('settings.password.error'));
                     }
                   }} className="bg-accent-500 hover:bg-accent-600 text-white px-6 py-2.5 rounded-xl font-medium transition-colors mt-2 text-sm">
                     {t('settings.password.save')}

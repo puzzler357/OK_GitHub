@@ -4,11 +4,13 @@ import { Plus, FileText, Search, MoreHorizontal, FileSignature } from 'lucide-re
 import { useNavigate } from 'react-router-dom';
 import { useDatabaseStore } from '../store/useDatabaseStore';
 import { clickable } from '../lib/a11y';
+import { useNotify } from '../components/Toasts';
 
 export default function Templates() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { templates } = useDatabaseStore();
+  const { templates, deleteTemplate } = useDatabaseStore();
+  const notify = useNotify();
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredTemplates = templates.filter(template => 
@@ -51,10 +53,10 @@ export default function Templates() {
                 </div>
                 <button 
                   className="p-1 rounded hover:bg-surface-hover dark:hover:bg-slate-800 text-muted opacity-0 group-hover:opacity-100 transition-opacity" 
-                  onClick={(e) => { 
-                    e.stopPropagation(); 
-                    if (window.confirm(t('templates.deleteConfirm'))) {
-                      useDatabaseStore.getState().deleteTemplate(template.id);
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (await notify.confirm(t('templates.deleteConfirm'), { danger: true })) {
+                      deleteTemplate(template.id);
                     }
                   }}>
                   <MoreHorizontal className="w-5 h-5" />

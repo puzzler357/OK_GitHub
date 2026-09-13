@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Шрифт лежит рядом с приложением: внешний @import не работал бы в офлайне,
+   ради которого приложение и делается. Файлы обновляются npm run fetch:fonts. */
+@import "./fonts.css";
 @import "tailwindcss";
 @custom-variant dark (&:is(.dark *));
 

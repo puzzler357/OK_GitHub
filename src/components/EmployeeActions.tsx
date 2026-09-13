@@ -7,6 +7,7 @@ import EmployeeHistory from './EmployeeHistory';
 import { renderTemplate } from '../lib/templateVars';
 import { useAppStore } from '../store/useAppStore';
 import { clickable } from '../lib/a11y';
+import { useNotify } from './Toasts';
 
 export default function EmployeeActions({ employee }: { employee: Employee }) {
   const { t } = useTranslation();
@@ -14,16 +15,16 @@ export default function EmployeeActions({ employee }: { employee: Employee }) {
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const notify = useNotify();
 
   const { deleteEmployee, updateEmployee, templates } = useDatabaseStore();
 
   const toggleDropdown = () => setIsOpen(!isOpen);
 
-  const handleDelete = () => {
-    if (window.confirm(t('employees.actions.deleteConfirm', { name: employee.fullName }))) {
-      deleteEmployee(employee.id);
-    }
+  const handleDelete = async () => {
     setIsOpen(false);
+    const ok = await notify.confirm(t('employees.actions.deleteConfirm', { name: employee.fullName }), { danger: true });
+    if (ok) deleteEmployee(employee.id);
   };
 
   const openDocModal = () => {

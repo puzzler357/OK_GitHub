@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDatabaseStore } from '../store/useDatabaseStore';
 import { useAppStore } from '../store/useAppStore';
 import { clickable } from '../lib/a11y';
+import { useNotify } from '../components/Toasts';
 
 export default function TemplateBuilder() {
   const { t } = useTranslation();
@@ -14,6 +15,7 @@ export default function TemplateBuilder() {
   
   const { templates, addTemplate, updateTemplate } = useDatabaseStore();
   const orgName = useAppStore((s) => s.orgName);
+  const notify = useNotify();
 
   const [templateName, setTemplateName] = useState(t('builder.newTemplate'));
   // Стартовый контент нового шаблона. Содержит {{переменные}}, подставляемые
@@ -156,7 +158,7 @@ export default function TemplateBuilder() {
             <h3 className="font-semibold mb-4 text-sm text-muted uppercase tracking-wider">{t('templates.variables')}</h3>
             <div className="space-y-1">
               {['{{fullName}}', '{{position}}', '{{department}}', '{{hireDate}}', '{{salary}}'].map(variable => (
-                <div key={variable} {...clickable(() => { navigator.clipboard.writeText(variable); alert(t('builder.copied', { v: variable })); }, variable)} className="px-3 py-2 bg-surface-2 dark:bg-slate-900 rounded-lg text-sm font-mono text-accent-600 dark:text-accent-400 cursor-pointer hover:bg-accent-50 dark:hover:bg-accent-900/30 transition-colors border border-[var(--border-color)]">
+                <div key={variable} {...clickable(() => { navigator.clipboard.writeText(variable); notify.success(t('builder.copied', { v: variable })); }, variable)} className="px-3 py-2 bg-surface-2 dark:bg-slate-900 rounded-lg text-sm font-mono text-accent-600 dark:text-accent-400 cursor-pointer hover:bg-accent-50 dark:hover:bg-accent-900/30 transition-colors border border-[var(--border-color)]">
                   {variable}
                 </div>
               ))}

@@ -22,6 +22,7 @@
     "start": "node dist/server.cjs",
     "seed:load": "tsx scripts/seedLoad.ts",
     "make:docx": "tsx scripts/makeDocxTemplate.ts",
+    "fetch:fonts": "tsx scripts/fetchFonts.ts",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Target, TrendingUp, Users, Award, X } from 'lucide-react';
 import { useDatabaseStore, TABLES } from '../store/useDatabaseStore';
 import type { Goal, Review } from '../store/useDatabaseStore';
+import { useNotify } from '../components/Toasts';
 
 /** Текущий период в том же формате, в каком он лежит в базе: 2026-Q3. */
 function currentPeriod(): string {
@@ -13,6 +14,7 @@ function currentPeriod(): string {
 export default function Performance() {
   const { t } = useTranslation();
   const { goals, reviews, employees, departments, createIn } = useDatabaseStore();
+  const notify = useNotify();
 
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [isAddGoalModalOpen, setIsAddGoalModalOpen] = useState(false);
@@ -202,7 +204,7 @@ export default function Performance() {
                 </button>
                 <button
                   onClick={() => {
-                    alert(t('performance.launched'));
+                    notify.success(t('performance.launched'));
                     setIsLaunchReviewModalOpen(false);
                   }}
                   className="flex-1 bg-accent-500 hover:bg-accent-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"

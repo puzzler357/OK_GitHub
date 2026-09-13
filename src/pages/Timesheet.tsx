@@ -5,11 +5,13 @@ import { ATTENDANCE_CODES, codeForDay, timesheetTotals } from '../lib/timesheet'
 import { useTranslation } from 'react-i18next';
 import { Clock, Calendar as CalendarIcon, Save, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { useDatabaseStore } from '../store/useDatabaseStore';
+import { useNotify } from '../components/Toasts';
 
 
 export default function Timesheet() {
   const { t } = useTranslation();
   const { employees, timesheets, addTimesheet, updateTimesheet, fetchTimesheets } = useDatabaseStore();
+  const notify = useNotify();
   
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
@@ -105,7 +107,7 @@ export default function Timesheet() {
         addTimesheet({ year, month, employeeId: emp.id, days });
       }
     });
-    alert(t('timesheet.saved'));
+    notify.success(t('timesheet.saved'));
   };
 
   const toggleDayStatus = (empId: string, day: number) => {
