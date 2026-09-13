@@ -176,6 +176,68 @@ describe('массовый импорт сотрудников', () => {
   });
 });
 
+describe('выборка срезом', () => {
+  it('GET /api/timesheets?year&month отдаёт только запрошенный период', async () => {
+    const mk = (year: number, month: number) =>
+      api('POST', '/api/timesheets', { year, month, employeeId: '1', days: { 1: 8 } });
+
+    const a = await mk(2030, 4);
+    const b = await mk(2030, 5);
+    const c = await mk(2031, 4);
+
+    const sliced = (await api('GET', '/api/timesheets?year=2030&month=4')).body;
+    expect(sliced.map((t: any) => t.id)).toEqual([a.body.id]);
+
+    const byYear = (await api('GET', '/api/timesheets?year=2030')).body;
+    expect(byYear.map((t: any) => t.id).sort()).toEqual([a.body.id, b.body.id].sort());
+
+    // Без параметров поведение прежнее — отдаётся всё.
+    const all = (await api('GET', '/api/timesheets')).body;
+    expect(all.length).toBeGreaterThanOrEqual(3);
+
+    for (const r of [a, b, c]) await api('DELETE', `/api/timesheets/${r.body.id}`);
+  });
+
+  it('GET /api/archives фильтрует по году, подразделению и сотруднику', async () => {
+    const mk = (year: number, department: string, employeeId: string) =>
+      api('POST', '/api/archives', {
+        year, month: 1, employeeId, employeeName: 'Срез Тест',
+        department, position: 'Инженер', salary: 100, hoursWorked: 160,
+      });
+
+    const a = await mk(2030, 'Срезовый отдел', '1');
+    const b = await mk(2030, 'Другой отдел', '2');
+    const c = await mk(2031, 'Срезовый отдел', '1');
+
+    expect((await api('GET', '/api/archives?year=2030')).body.map((r: any) => r.id).sort())
+      .toEqual([a.body.id, b.body.id].sort());
+
+    expect((await api('GET', '/api/archives?department=Срезовый отдел')).body.map((r: any) => r.id).sort())
+      .toEqual([a.body.id, c.body.id].sort());
+
+    expect((await api('GET', '/api/archives?year=2030&employeeId=2')).body.map((r: any) => r.id))
+      .toEqual([b.body.id]);
+
+    for (const r of [a, b, c]) await api('DELETE', `/api/archives/${r.body.id}`);
+  });
+
+  it('GET /api/archives/facets считает значения по всей таблице, а не по срезу', async () => {
+    const rec = await api('POST', '/api/archives', {
+      year: 2029, month: 1, employeeId: '1', employeeName: 'Фасет Тест',
+      department: 'Фасетный отдел', position: 'Инженер', salary: 100, hoursWorked: 160,
+    });
+
+    const { status, body } = await api('GET', '/api/archives/facets');
+    expect(status).toBe(200);
+    expect(body.years).toContain(2029);
+    expect(body.departments).toContain('Фасетный отдел');
+    // Годы приходят по убыванию — выпадающий список показывает свежие сверху.
+    expect([...body.years].sort((a: number, b: number) => b - a)).toEqual(body.years);
+
+    await api('DELETE', `/api/archives/${rec.body.id}`);
+  });
+});
+
 describe('CRUD оргструктуры', () => {
   it('подразделение: создание с родителем, переименование, удаление', async () => {
     const { body } = await api('POST', '/api/departments', { name: 'Тестовый отдел', parentId: 'd1' });

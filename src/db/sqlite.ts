@@ -72,6 +72,18 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+
+  -- Индексы под выборки по срезу и фильтры экранов. Без них каждый запрос
+  -- по году/месяцу или подразделению — полное сканирование таблицы.
+  CREATE INDEX IF NOT EXISTS idx_employees_department ON employees(department);
+  CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(status);
+  CREATE INDEX IF NOT EXISTS idx_timesheets_period ON timesheets(year, month);
+  CREATE INDEX IF NOT EXISTS idx_timesheets_employee ON timesheets(employee_id);
+  CREATE INDEX IF NOT EXISTS idx_archives_year ON archives(year);
+  CREATE INDEX IF NOT EXISTS idx_archives_employee ON archives(employee_id);
+  CREATE INDEX IF NOT EXISTS idx_archives_department ON archives(department);
+  CREATE INDEX IF NOT EXISTS idx_positions_department ON positions(department_id);
+  CREATE INDEX IF NOT EXISTS idx_departments_parent ON departments(parent_id);
 `);
 
 // Миграции для баз, созданных предыдущими версиями схемы.

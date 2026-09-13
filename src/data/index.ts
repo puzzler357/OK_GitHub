@@ -3,7 +3,7 @@
 // в вебе (dev через браузер) — с локальным Express-бэкендом по /api.
 import * as tauri from './tauriDb';
 import type {
-  Employee, Department, Position, TimesheetRecord, ArchiveRecord, Template, LoginResult,
+  Employee, Department, Position, TimesheetRecord, ArchiveRecord, ArchiveFilters, Template, LoginResult,
 } from './types';
 
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -98,8 +98,16 @@ export const deleteTemplate = (id: string): Promise<void> =>
   isTauri ? tauri.deleteTemplateRow(id) : fetch(`/api/templates/${id}`, { method: 'DELETE' }).then(() => undefined);
 
 // ---- Timesheets ----
-export const listTimesheets = (): Promise<TimesheetRecord[]> =>
-  isTauri ? tauri.listTimesheets() : fetch('/api/timesheets').then((r) => r.json());
+// Табель и архив запрашиваются срезом: обе таблицы растут линейно по времени
+// и по штату, тянуть их целиком при каждом входе нельзя.
+export const listTimesheets = (year?: number, month?: number): Promise<TimesheetRecord[]> => {
+  if (isTauri) return tauri.listTimesheets(year, month);
+  const query = new URLSearchParams();
+  if (year !== undefined) query.set('year', String(year));
+  if (month !== undefined) query.set('month', String(month));
+  const suffix = query.toString();
+  return fetch(`/api/timesheets${suffix ? `?${suffix}` : ''}`).then((r) => r.json());
+};
 
 export const createTimesheet = (rec: Omit<TimesheetRecord, 'id'> & { id?: string }): Promise<{ id: string }> => {
   if (isTauri) return tauri.createTimesheet(rec);
@@ -116,8 +124,19 @@ export const deleteTimesheet = (id: string): Promise<void> =>
   isTauri ? tauri.deleteTimesheetRow(id) : fetch(`/api/timesheets/${id}`, { method: 'DELETE' }).then(() => undefined);
 
 // ---- Archives ----
-export const listArchives = (): Promise<ArchiveRecord[]> =>
-  isTauri ? tauri.listArchives() : fetch('/api/archives').then((r) => r.json());
+export const listArchives = (filters: ArchiveFilters = {}): Promise<ArchiveRecord[]> => {
+  if (isTauri) return tauri.listArchives(filters);
+  const query = new URLSearchParams();
+  if (filters.year !== undefined) query.set('year', String(filters.year));
+  if (filters.department !== undefined) query.set('department', filters.department);
+  if (filters.employeeId !== undefined) query.set('employeeId', filters.employeeId);
+  const suffix = query.toString();
+  return fetch(`/api/archives${suffix ? `?${suffix}` : ''}`).then((r) => r.json());
+};
+
+/** Значения для фильтров архива — считаются по всей таблице, а не по срезу. */
+export const listArchiveFacets = (): Promise<{ years: number[]; departments: string[] }> =>
+  isTauri ? tauri.listArchiveFacets() : fetch('/api/archives/facets').then((r) => r.json());
 
 export const createArchive = (rec: Omit<ArchiveRecord, 'id'> & { id?: string }): Promise<{ id: string }> => {
   if (isTauri) return tauri.createArchive(rec);

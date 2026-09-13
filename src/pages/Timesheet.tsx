@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useTranslation } from 'react-i18next';
 import { Clock, Calendar as CalendarIcon, Save, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { useDatabaseStore } from '../store/useDatabaseStore';
@@ -20,7 +21,7 @@ const ATTENDANCE_CODES = {
 
 export default function Timesheet() {
   const { t } = useTranslation();
-  const { employees, timesheets, addTimesheet, updateTimesheet } = useDatabaseStore();
+  const { employees, timesheets, addTimesheet, updateTimesheet, fetchTimesheets } = useDatabaseStore();
   
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
@@ -28,6 +29,12 @@ export default function Timesheet() {
   const filteredEmployees = useMemo(() => employees.filter(e => selectedDepartment === 'all' || e.department === selectedDepartment), [employees, selectedDepartment]);
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
+
+  // Табель грузится помесячно: вся таблица на 10 000 сотрудников — это годы
+  // записей, из которых на экране нужен ровно один месяц.
+  useEffect(() => {
+    fetchTimesheets(year, month);
+  }, [fetchTimesheets, year, month]);
 
   // Load records for current month
   const [localDays, setLocalDays] = useState<Record<string, Record<number, string>>>({});
@@ -46,6 +53,23 @@ export default function Timesheet() {
   }, [year, month, employees, timesheets]);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // Самый тяжёлый экран приложения: 10 000 сотрудников на 31 колонку дней —
+  // это больше 300 000 узлов DOM. Виртуализируем строки; закреплённые слева
+  // и справа колонки при этом остаются на месте, потому что распорки —
+  // обычные <tr>, а не обёртки вокруг таблицы.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: filteredEmployees.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 57,
+    overscan: 10,
+  });
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const paddingBottom = virtualRows.length > 0
+    ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
+    : 0;
   
   const handlePrevMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1));
@@ -191,7 +215,7 @@ export default function Timesheet() {
       </div>
 
       <div className="flex-1 overflow-hidden bg-surface-2 border border-line rounded-2xl flex flex-col">
-        <div className="overflow-x-auto overflow-y-auto custom-scrollbar flex-1">
+        <div ref={scrollRef} className="overflow-x-auto overflow-y-auto custom-scrollbar flex-1">
           <table className="w-full text-sm text-left border-collapse">
             <thead className="text-xs text-muted uppercase bg-surface-3 sticky top-0 z-20">
               <tr>
@@ -217,7 +241,9 @@ export default function Timesheet() {
               </tr>
             </thead>
             <tbody>
-              {filteredEmployees.map(emp => {
+              {paddingTop > 0 && <tr style={{ height: paddingTop }} aria-hidden />}
+              {virtualRows.map(virtualRow => {
+                const emp = filteredEmployees[virtualRow.index];
                 const days = localDays[emp.id] || {};
                 
                 // Calculate summaries
@@ -273,6 +299,7 @@ export default function Timesheet() {
                   </tr>
                 );
               })}
+              {paddingBottom > 0 && <tr style={{ height: paddingBottom }} aria-hidden />}
             </tbody>
           </table>
         </div>

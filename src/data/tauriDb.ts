@@ -4,7 +4,7 @@
 import Database from '@tauri-apps/plugin-sql';
 import bcrypt from 'bcryptjs';
 import type {
-  Employee, Department, Position, TimesheetRecord, ArchiveRecord, Template, LoginResult,
+  Employee, Department, Position, TimesheetRecord, ArchiveRecord, ArchiveFilters, Template, LoginResult,
 } from './types';
 
 const DB_URL = 'sqlite:local-hr-docs.db';
@@ -84,6 +84,18 @@ async function initSchema(db: Database) {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    -- Индексы под выборки по срезу и фильтры экранов. Без них каждый запрос
+    -- по году/месяцу или подразделению — полное сканирование таблицы.
+    CREATE INDEX IF NOT EXISTS idx_employees_department ON employees(department);
+    CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(status);
+    CREATE INDEX IF NOT EXISTS idx_timesheets_period ON timesheets(year, month);
+    CREATE INDEX IF NOT EXISTS idx_timesheets_employee ON timesheets(employee_id);
+    CREATE INDEX IF NOT EXISTS idx_archives_year ON archives(year);
+    CREATE INDEX IF NOT EXISTS idx_archives_employee ON archives(employee_id);
+    CREATE INDEX IF NOT EXISTS idx_archives_department ON archives(department);
+    CREATE INDEX IF NOT EXISTS idx_positions_department ON positions(department_id);
+    CREATE INDEX IF NOT EXISTS idx_departments_parent ON departments(parent_id);
   `);
 
   // База, созданная предыдущей версией схемы, колонки tab_number не имеет.
@@ -310,9 +322,16 @@ export async function deleteTemplateRow(id: string): Promise<void> {
 }
 
 // ---- Timesheets ----
-export async function listTimesheets(): Promise<TimesheetRecord[]> {
+export async function listTimesheets(year?: number, month?: number): Promise<TimesheetRecord[]> {
   const db = await getDb();
-  const rows = await db.select<any[]>('SELECT * FROM timesheets');
+  const where: string[] = [];
+  const params: any[] = [];
+  if (year !== undefined) { where.push(`year = $${params.push(year)}`); }
+  if (month !== undefined) { where.push(`month = $${params.push(month)}`); }
+  const rows = await db.select<any[]>(
+    `SELECT * FROM timesheets${where.length ? ` WHERE ${where.join(' AND ')}` : ''}`,
+    params,
+  );
   return rows.map((t) => ({ id: t.id, year: t.year, month: t.month, employeeId: t.employee_id, days: JSON.parse(t.days) }));
 }
 export async function createTimesheet(rec: Omit<TimesheetRecord, 'id'> & { id?: string }): Promise<{ id: string }> {
@@ -331,9 +350,24 @@ export async function deleteTimesheetRow(id: string): Promise<void> {
 }
 
 // ---- Archives ----
-export async function listArchives(): Promise<ArchiveRecord[]> {
+export async function listArchiveFacets(): Promise<{ years: number[]; departments: string[] }> {
   const db = await getDb();
-  const rows = await db.select<any[]>('SELECT * FROM archives');
+  const years = await db.select<{ year: number }[]>('SELECT DISTINCT year FROM archives ORDER BY year DESC');
+  const departments = await db.select<{ department: string }[]>('SELECT DISTINCT department FROM archives ORDER BY department');
+  return { years: years.map((r) => r.year), departments: departments.map((r) => r.department) };
+}
+
+export async function listArchives(filters: ArchiveFilters = {}): Promise<ArchiveRecord[]> {
+  const db = await getDb();
+  const where: string[] = [];
+  const params: any[] = [];
+  if (filters.year !== undefined) { where.push(`year = $${params.push(filters.year)}`); }
+  if (filters.department !== undefined) { where.push(`department = $${params.push(filters.department)}`); }
+  if (filters.employeeId !== undefined) { where.push(`employee_id = $${params.push(filters.employeeId)}`); }
+  const rows = await db.select<any[]>(
+    `SELECT * FROM archives${where.length ? ` WHERE ${where.join(' AND ')}` : ''}`,
+    params,
+  );
   return rows.map((a) => ({
     id: a.id, year: a.year, month: a.month, employeeId: a.employee_id, employeeName: a.employee_name,
     department: a.department, position: a.position, salary: a.salary, hoursWorked: a.hours_worked,

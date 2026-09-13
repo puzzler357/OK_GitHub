@@ -50,6 +50,13 @@ export interface ArchiveRecord {
   hoursWorked: number;
 }
 
+/** Срез архива: экран запрашивает только то, что показывает. */
+export interface ArchiveFilters {
+  year?: number;
+  department?: string;
+  employeeId?: string;
+}
+
 export interface Template {
   id: string;
   name: string;

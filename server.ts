@@ -198,8 +198,16 @@ app.delete('/api/templates/:id', (req, res) => {
 });
 
 // API Timesheets
+// Табель и архив растут линейно по времени и по штату, поэтому тянуть их
+// целиком нельзя. Параметры запроса задают срез; без них поведение прежнее.
 app.get('/api/timesheets', (req, res) => {
-  const timesheets = db.prepare('SELECT * FROM timesheets').all().map((t: any) => ({
+  const where: string[] = [];
+  const params: any[] = [];
+  if (req.query.year !== undefined) { where.push('year = ?'); params.push(Number(req.query.year)); }
+  if (req.query.month !== undefined) { where.push('month = ?'); params.push(Number(req.query.month)); }
+  const sql = `SELECT * FROM timesheets${where.length ? ` WHERE ${where.join(' AND ')}` : ''}`;
+
+  const timesheets = db.prepare(sql).all(...params).map((t: any) => ({
     id: t.id,
     year: t.year,
     month: t.month,
@@ -231,8 +239,23 @@ app.delete('/api/timesheets/:id', (req, res) => {
 
 
 // API Archives
+// Значения для выпадающих фильтров архива. Считаются по всей таблице,
+// поэтому список лет и подразделений не схлопывается при выбранном срезе.
+app.get('/api/archives/facets', (_req, res) => {
+  const years = db.prepare('SELECT DISTINCT year FROM archives ORDER BY year DESC').all().map((r: any) => r.year);
+  const departments = db.prepare('SELECT DISTINCT department FROM archives ORDER BY department').all().map((r: any) => r.department);
+  res.json({ years, departments });
+});
+
 app.get('/api/archives', (req, res) => {
-  const archives = db.prepare('SELECT * FROM archives').all().map((a: any) => ({
+  const where: string[] = [];
+  const params: any[] = [];
+  if (req.query.year !== undefined) { where.push('year = ?'); params.push(Number(req.query.year)); }
+  if (req.query.department !== undefined) { where.push('department = ?'); params.push(String(req.query.department)); }
+  if (req.query.employeeId !== undefined) { where.push('employee_id = ?'); params.push(String(req.query.employeeId)); }
+  const sql = `SELECT * FROM archives${where.length ? ` WHERE ${where.join(' AND ')}` : ''}`;
+
+  const archives = db.prepare(sql).all(...params).map((a: any) => ({
     id: a.id,
     year: a.year,
     month: a.month,

@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useTranslation } from 'react-i18next';
 import { useDatabaseStore } from '../store/useDatabaseStore';
 import { useMoney } from '../lib/money';
@@ -9,41 +10,77 @@ import html2pdf from 'html2pdf.js';
 
 export default function Archive() {
   const { t } = useTranslation();
-  const { archives, employees } = useDatabaseStore();
+  const { archives, archiveFacets, employees, fetchArchives, fetchArchiveFacets } = useDatabaseStore();
   const money = useMoney();
-  
+
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
 
-  // Available years from archives
+  // Значения фильтров считаются по всей таблице отдельным запросом: если
+  // брать их из загруженного среза, список лет схлопнулся бы до текущего.
+  useEffect(() => {
+    fetchArchiveFacets();
+  }, [fetchArchiveFacets]);
+
+  // С сервера приходит уже отфильтрованный срез, а не вся таблица.
+  useEffect(() => {
+    fetchArchives({
+      year: selectedYear === 'all' ? undefined : Number(selectedYear),
+      department: selectedDepartment === 'all' ? undefined : selectedDepartment,
+      employeeId: selectedEmployee === 'all' ? undefined : selectedEmployee,
+    });
+  }, [fetchArchives, selectedYear, selectedDepartment, selectedEmployee]);
+
   const availableYears = useMemo(() => {
-    const years = new Set(archives.map(a => a.year));
-    // add current and previous year just in case
+    const years = new Set(archiveFacets.years);
+    // Текущий и прошлый год показываем всегда, даже если записей за них ещё нет.
     years.add(new Date().getFullYear());
     years.add(new Date().getFullYear() - 1);
     return Array.from(years).sort((a, b) => b - a);
-  }, [archives]);
+  }, [archiveFacets.years]);
 
-  // Available departments
-  const availableDepartments = useMemo(() => {
-    const depts = new Set(archives.map(a => a.department));
-    return Array.from(depts).sort();
-  }, [archives]);
+  const availableDepartments = archiveFacets.departments;
 
-  // Filtered archives
-  const filteredArchives = useMemo(() => {
-    return archives.filter(record => {
-      const matchYear = selectedYear === 'all' || record.year.toString() === selectedYear;
-      const matchDept = selectedDepartment === 'all' || record.department === selectedDepartment;
-      const matchEmp = selectedEmployee === 'all' || record.employeeId === selectedEmployee;
-      return matchYear && matchDept && matchEmp;
-    });
-  }, [archives, selectedYear, selectedDepartment, selectedEmployee]);
+  // Фильтрация выполнена запросом; переменная оставлена как имя для читаемости.
+  const filteredArchives = archives;
 
   // Aggregate by employee for the selected year if needed, or just show raw records
   // Let's show raw records (monthly) or aggregate them? The prompt says "all data of each past year... each employee, each month, each year".
   // So displaying the records as they are is fine, maybe grouped or just a list.
+
+  // Виртуализация строк. Печать и выгрузка в PDF снимают таблицу прямо с
+  // экрана, поэтому на время экспорта её нужно отрисовать целиком — иначе в
+  // файл попали бы только видимые строки.
+  const [renderAll, setRenderAll] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: filteredArchives.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 45,
+    overscan: 15,
+  });
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const paddingTop = renderAll || virtualRows.length === 0 ? 0 : virtualRows[0].start;
+  const paddingBottom = renderAll || virtualRows.length === 0
+    ? 0
+    : rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end;
+
+  const renderedRecords = renderAll
+    ? filteredArchives
+    : virtualRows.map((v) => filteredArchives[v.index]);
+
+  const withFullTable = async (action: () => unknown) => {
+    setRenderAll(true);
+    // Два кадра: один на пересчёт состояния, второй на фактическую отрисовку.
+    await new Promise(requestAnimationFrame);
+    await new Promise(requestAnimationFrame);
+    try {
+      await action();
+    } finally {
+      setRenderAll(false);
+    }
+  };
 
   const handleExportExcel = () => {
     const data = filteredArchives.map(a => ({
@@ -72,11 +109,11 @@ export default function Archive() {
       html2canvas:  { scale: 2 },
       jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' as const }
     };
-    html2pdf().set(opt).from(element).save();
+    void withFullTable(() => html2pdf().set(opt).from(element).save());
   };
 
   const handlePrint = () => {
-    window.print();
+    void withFullTable(() => window.print());
   };
 
   return (
@@ -156,7 +193,10 @@ export default function Archive() {
       </div>
 
       <div className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-xl overflow-hidden print-container" id="archive-table-container">
-        <div className="overflow-x-auto">
+        <div
+          ref={scrollRef}
+          className={`overflow-x-auto custom-scrollbar ${renderAll ? '' : 'overflow-y-auto max-h-[calc(100vh-24rem)]'}`}
+        >
           <table className="w-full text-left">
             <thead className="bg-surface-3 text-secondary">
               <tr>
@@ -177,7 +217,9 @@ export default function Archive() {
                   </td>
                 </tr>
               ) : (
-                filteredArchives.map((record) => (
+                <>
+                {paddingTop > 0 && <tr style={{ height: paddingTop }} aria-hidden />}
+                {renderedRecords.map((record) => (
                   <tr key={record.id} className="hover:bg-surface-hover transition-colors">
                     <td className="p-table text-table font-medium text-primary">{record.year}</td>
                     <td className="p-table text-table">{record.month}</td>
@@ -191,7 +233,9 @@ export default function Archive() {
                       {record.hoursWorked} {t('archive.hoursShort')}
                     </td>
                   </tr>
-                ))
+                ))}
+                {paddingBottom > 0 && <tr style={{ height: paddingBottom }} aria-hidden />}
+                </>
               )}
             </tbody>
           </table>
