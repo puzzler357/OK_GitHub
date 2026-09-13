@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store/useAppStore';
+import { useMoney } from '../lib/money';
 import { User, Mail, Briefcase, Shield, Key, FileText, Calendar as CalendarIcon, Laptop, CheckSquare, Download } from 'lucide-react';
 
 export default function Profile() {
   const { t } = useTranslation();
   const { user } = useAppStore();
+  const money = useMoney();
   const [activeTab, setActiveTab] = useState('overview');
 
   const payslips = [
-    { id: 1, month: 'Июль 2024', amount: '125 000 ₽', status: 'Выплачено' },
-    { id: 2, month: 'Июнь 2024', amount: '125 000 ₽', status: 'Выплачено' },
-    { id: 3, month: 'Май 2024', amount: '125 000 ₽', status: 'Выплачено' },
+    { id: 1, month: 'Июль 2024', amount: money.format(125000), status: 'Выплачено' },
+    { id: 2, month: 'Июнь 2024', amount: money.format(125000), status: 'Выплачено' },
+    { id: 3, month: 'Май 2024', amount: money.format(125000), status: 'Выплачено' },
   ];
 
   const timeOffs = [

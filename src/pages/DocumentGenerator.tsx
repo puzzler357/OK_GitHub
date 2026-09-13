@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDatabaseStore } from '../store/useDatabaseStore';
+import { useMoney } from '../lib/money';
 import { FileText, Download, Printer, User } from 'lucide-react';
 
 export default function DocumentGenerator() {
   const { t } = useTranslation();
   const { templates, employees } = useDatabaseStore();
+  const money = useMoney();
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [variables, setVariables] = useState<Record<string, string>>({});
@@ -40,7 +42,7 @@ export default function DocumentGenerator() {
           <tbody>
             <tr>
               <td style="border: 1px solid #e2e8f0; padding: 0.75rem;">${t('docgen.baseSalary')}</td>
-              <td style="border: 1px solid #e2e8f0; padding: 0.75rem;">${variables['salary'] || '...'}</td>
+              <td style="border: 1px solid #e2e8f0; padding: 0.75rem;">${variables['salary'] || (employee?.salary != null ? money.format(employee.salary) : '...')}</td>
             </tr>
           </tbody>
         </table>`;
@@ -60,6 +62,7 @@ export default function DocumentGenerator() {
              if (varName === 'fullName' || varName === 'ФИО') text = text.replace(m, employee.fullName);
              if (varName === 'position' || varName === 'Должность') text = text.replace(m, employee.position);
              if (varName === 'department' || varName === 'Отдел') text = text.replace(m, employee.department);
+             if (varName === 'salary' || varName === 'Оклад') text = text.replace(m, money.format(employee.salary ?? 0));
           }
         });
       }

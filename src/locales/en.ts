@@ -64,6 +64,11 @@ export const en = {
       allDepartments: "All departments",
       allStatuses: "All statuses",
       anyRate: "Any rate",
+      rateFull: "Full rate",
+      ratePartial: "Part rate",
+      rateExtended: "Above full rate",
+      importDone: "Employees imported: {{n}}",
+      importFailed: "Failed to save imported rows",
       empty: "No results found for your query",
       readError: "Failed to read the file",
       col: {
@@ -422,6 +427,20 @@ export const en = {
       }
     },
     settings: {
+      currency: {
+        title: "Money format",
+        symbol: "Currency symbol",
+        position: "Symbol position",
+        prefix: "Before amount",
+        suffix: "After amount",
+        decimals: "Decimal places",
+        separator: "Thousands separator",
+        sepSpace: "Space",
+        sepComma: "Comma",
+        sepDot: "Dot",
+        sepNone: "None",
+        preview: "Preview"
+      },
       title: "Settings",
       language: "Language",
       theme: "Theme",

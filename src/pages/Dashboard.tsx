@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Users, FileText, Network, BarChart as BarChartIcon, Gift } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useDatabaseStore } from '../store/useDatabaseStore';
+import { useMoney } from '../lib/money';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#3b82f6', '#ec4899'];
 
@@ -16,6 +17,7 @@ export default function Dashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { employees } = useDatabaseStore();
+  const money = useMoney();
 
   const birthdaysToday = useMemo(() => {
     const today = new Date();
@@ -94,7 +96,7 @@ export default function Dashboard() {
             <h3 className="text-sm font-medium text-muted">{t('dashboard.payroll')}</h3>
             <BarChartIcon className="w-5 h-5 text-rose-500" />
           </div>
-          <p className="text-3xl font-semibold tabular-nums text-primary dark:text-primary">{(totalFOT / 1000000).toFixed(1)}M</p>
+          <p className="text-3xl font-semibold tabular-nums text-primary dark:text-primary">{money.format(totalFOT, { compact: true })}</p>
           <p className="text-sm text-muted mt-2">{t('dashboard.perMonth')}</p>
         </div>
       </div>

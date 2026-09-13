@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import i18n from '../i18n';
+import { DEFAULT_CURRENCY } from '../lib/money';
+import type { CurrencyDecimals, CurrencyPosition, ThousandsSeparator } from '../lib/money';
 
 type Theme = 'light' | 'dark' | 'system';
 type AccentColor = 'indigo' | 'purple' | 'blue' | 'emerald' | 'rose' | 'amber';
@@ -23,6 +25,16 @@ interface AppState {
   sidebarOpen: boolean;
   user: User | null;
   token: string | null;
+
+  // Формат денежных сумм — «Настройки → Общие».
+  currencySymbol: string;
+  currencyPosition: CurrencyPosition;
+  currencyDecimals: CurrencyDecimals;
+  thousandsSeparator: ThousandsSeparator;
+  setCurrencySymbol: (symbol: string) => void;
+  setCurrencyPosition: (position: CurrencyPosition) => void;
+  setCurrencyDecimals: (decimals: CurrencyDecimals) => void;
+  setThousandsSeparator: (separator: ThousandsSeparator) => void;
   setTheme: (theme: Theme) => void;
   setAccentColor: (color: AccentColor) => void;
   setDensity: (density: Density) => void;
@@ -47,6 +59,15 @@ export const useAppStore = create<AppState>()(
       sidebarOpen: true,
       user: null,
       token: null,
+
+      currencySymbol: DEFAULT_CURRENCY.currencySymbol,
+      currencyPosition: DEFAULT_CURRENCY.currencyPosition,
+      currencyDecimals: DEFAULT_CURRENCY.currencyDecimals,
+      thousandsSeparator: DEFAULT_CURRENCY.thousandsSeparator,
+      setCurrencySymbol: (currencySymbol) => set({ currencySymbol }),
+      setCurrencyPosition: (currencyPosition) => set({ currencyPosition }),
+      setCurrencyDecimals: (currencyDecimals) => set({ currencyDecimals }),
+      setThousandsSeparator: (thousandsSeparator) => set({ thousandsSeparator }),
       setTheme: (theme) => {
         set({ theme });
         applyTheme(theme);

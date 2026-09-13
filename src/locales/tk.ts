@@ -64,6 +64,11 @@ export const tk = {
       allDepartments: "Ähli bölümler",
       allStatuses: "Ähli ýagdaýlar",
       anyRate: "Islendik stawka",
+      rateFull: "Doly stawka",
+      ratePartial: "Doly däl stawka",
+      rateExtended: "Stawkadan ýokary",
+      importDone: "Import edilen işgärler: {{n}}",
+      importFailed: "Import edilen setirleri ýatda saklap bolmady",
       empty: "Soragyňyz boýunça hiç zat tapylmady",
       readError: "Faýly okamakda ýalňyşlyk",
       col: {
@@ -422,6 +427,20 @@ export const tk = {
       }
     },
     settings: {
+      currency: {
+        title: "Pul möçberleri",
+        symbol: "Walýuta belgisi",
+        position: "Belginiň ýerleşişi",
+        prefix: "Möçberden öň",
+        suffix: "Möçberden soň",
+        decimals: "Onluk belgiler",
+        separator: "Derejeleriň bölüjisi",
+        sepSpace: "Boşluk",
+        sepComma: "Otur",
+        sepDot: "Nokat",
+        sepNone: "Bölüjisiz",
+        preview: "Mysal"
+      },
       title: "Sazlamalar",
       language: "Dil",
       theme: "Görnüş temasy",

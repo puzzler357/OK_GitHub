@@ -64,6 +64,11 @@ export const ru = {
       allDepartments: "Все отделы",
       allStatuses: "Все статусы",
       anyRate: "Любая ставка",
+      rateFull: "Полная ставка",
+      ratePartial: "Неполная ставка",
+      rateExtended: "Свыше ставки",
+      importDone: "Импортировано сотрудников: {{n}}",
+      importFailed: "Не удалось сохранить импортированные строки",
       empty: "По вашему запросу ничего не найдено",
       readError: "Ошибка при чтении файла",
       col: {
@@ -422,6 +427,20 @@ export const ru = {
       }
     },
     settings: {
+      currency: {
+        title: "Денежные суммы",
+        symbol: "Символ валюты",
+        position: "Положение символа",
+        prefix: "Перед суммой",
+        suffix: "После суммы",
+        decimals: "Знаков после запятой",
+        separator: "Разделитель разрядов",
+        sepSpace: "Пробел",
+        sepComma: "Запятая",
+        sepDot: "Точка",
+        sepNone: "Без разделителя",
+        preview: "Пример"
+      },
       title: "Настройки",
       language: "Язык",
       theme: "Тема оформления",

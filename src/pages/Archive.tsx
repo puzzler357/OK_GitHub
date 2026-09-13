@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDatabaseStore } from '../store/useDatabaseStore';
+import { useMoney } from '../lib/money';
 import { Download, Filter, Printer, FileText } from 'lucide-react';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
@@ -9,6 +10,7 @@ import html2pdf from 'html2pdf.js';
 export default function Archive() {
   const { t } = useTranslation();
   const { archives, employees } = useDatabaseStore();
+  const money = useMoney();
   
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
@@ -183,7 +185,7 @@ export default function Archive() {
                     <td className="p-table text-table">{record.department}</td>
                     <td className="p-table text-table">{record.position}</td>
                     <td className="p-table text-table text-right font-medium">
-                      {record.salary.toLocaleString()} ₸
+                      {money.format(record.salary)}
                     </td>
                     <td className="p-table text-table text-right text-muted">
                       {record.hoursWorked} {t('archive.hoursShort')}

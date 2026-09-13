@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store/useAppStore';
 import { useDatabaseStore } from '../store/useDatabaseStore';
+import { useMoney } from '../lib/money';
+import type { CurrencyDecimals, CurrencyPosition, ThousandsSeparator } from '../lib/money';
 import * as api from '../data';
 import { Settings as SettingsIcon, ShieldCheck, Key, Shield, Database, Link, Palette, Eye, Download, RefreshCw, Check, Sun, Moon, Monitor } from 'lucide-react';
 
@@ -12,6 +14,11 @@ export default function Settings() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const { t } = useTranslation();
   const { theme, language, setTheme, setLanguage, accentColor, setAccentColor, density, setDensity, fontSize, setFontSize, user } = useAppStore();
+  const {
+    currencySymbol, currencyPosition, currencyDecimals, thousandsSeparator,
+    setCurrencySymbol, setCurrencyPosition, setCurrencyDecimals, setThousandsSeparator,
+  } = useAppStore();
+  const money = useMoney();
   const [activeTab, setActiveTab] = useState('general');
 
   
@@ -88,6 +95,62 @@ export default function Settings() {
                     <option value="tk">Türkmençe</option>
                   </select>
                 </div>
+                <div className="pt-2 border-t border-[var(--border-color)]">
+                  <h4 className="text-sm font-semibold text-primary mt-4 mb-4">{t('settings.currency.title')}</h4>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-secondary">{t('settings.currency.symbol')}</label>
+                      <input
+                        type="text"
+                        value={currencySymbol}
+                        maxLength={8}
+                        onChange={(e) => setCurrencySymbol(e.target.value)}
+                        className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-secondary">{t('settings.currency.position')}</label>
+                      <select
+                        value={currencyPosition}
+                        onChange={(e) => setCurrencyPosition(e.target.value as CurrencyPosition)}
+                        className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                      >
+                        <option value="prefix">{t('settings.currency.prefix')}</option>
+                        <option value="suffix">{t('settings.currency.suffix')}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-secondary">{t('settings.currency.decimals')}</label>
+                      <select
+                        value={currencyDecimals}
+                        onChange={(e) => setCurrencyDecimals(Number(e.target.value) as CurrencyDecimals)}
+                        className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                      >
+                        <option value={0}>0</option>
+                        <option value={2}>2</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-secondary">{t('settings.currency.separator')}</label>
+                      <select
+                        value={thousandsSeparator}
+                        onChange={(e) => setThousandsSeparator(e.target.value as ThousandsSeparator)}
+                        className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                      >
+                        <option value="space">{t('settings.currency.sepSpace')}</option>
+                        <option value="comma">{t('settings.currency.sepComma')}</option>
+                        <option value="dot">{t('settings.currency.sepDot')}</option>
+                        <option value="none">{t('settings.currency.sepNone')}</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-muted mt-4">
+                    {t('settings.currency.preview')}: <span className="text-primary tabular-nums font-medium">{money.format(1234567.89)}</span>
+                  </p>
+                </div>
+
                 <div className="pt-4">
                   <button className="bg-accent-600 hover:bg-accent-700 text-white px-6 py-2.5 rounded-xl font-medium transition-colors">
                     {t('common.save')}
