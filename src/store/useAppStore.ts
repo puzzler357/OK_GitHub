@@ -35,6 +35,10 @@ interface AppState {
   setCurrencyPosition: (position: CurrencyPosition) => void;
   setCurrencyDecimals: (decimals: CurrencyDecimals) => void;
   setThousandsSeparator: (separator: ThousandsSeparator) => void;
+
+  /** Путь к .docx-бланку для генерации документов (см. scripts/makeDocxTemplate.ts). */
+  docxTemplatePath: string;
+  setDocxTemplatePath: (path: string) => void;
   setTheme: (theme: Theme) => void;
   setAccentColor: (color: AccentColor) => void;
   setDensity: (density: Density) => void;
@@ -68,6 +72,9 @@ export const useAppStore = create<AppState>()(
       setCurrencyPosition: (currencyPosition) => set({ currencyPosition }),
       setCurrencyDecimals: (currencyDecimals) => set({ currencyDecimals }),
       setThousandsSeparator: (thousandsSeparator) => set({ thousandsSeparator }),
+
+      docxTemplatePath: '/templates/blank.docx',
+      setDocxTemplatePath: (docxTemplatePath) => set({ docxTemplatePath }),
       setTheme: (theme) => {
         set({ theme });
         applyTheme(theme);

@@ -3,13 +3,13 @@ import * as api from '../data';
 import { ENTITIES, ENTITY_BY_TABLE } from '../data/entities';
 import type {
   Employee, Department, Position, TimesheetRecord, ArchiveRecord, ArchiveFilters, Template,
-  Candidate, TimeOffRequest, ChecklistTask, Goal, Review, KbCategory, KbArticle, Movement, AuditEntry,
+  Candidate, TimeOffRequest, ChecklistTask, Goal, Review, KbCategory, KbArticle, Movement, AuditEntry, ReportPreset,
 } from '../data/types';
 
 // Ре-экспорт типов: страницы импортируют их из этого модуля.
 export type {
   Employee, Department, Position, TimesheetRecord, ArchiveRecord, ArchiveFilters, Template,
-  Candidate, TimeOffRequest, ChecklistTask, Goal, Review, KbCategory, KbArticle, Movement, MovementType, AuditEntry,
+  Candidate, TimeOffRequest, ChecklistTask, Goal, Review, KbCategory, KbArticle, Movement, MovementType, AuditEntry, ReportPreset,
 } from '../data/types';
 export { TABLES } from '../data/entities';
 
@@ -62,6 +62,7 @@ interface DatabaseState {
   kbArticles: KbArticle[];
   movements: Movement[];
   auditLog: AuditEntry[];
+  reportPresets: ReportPreset[];
 
   addPosition: (pos: Omit<Position, 'id'>) => Promise<void>;
   updatePosition: (id: string, data: Partial<Position>) => Promise<void>;
@@ -114,6 +115,7 @@ export const useDatabaseStore = create<DatabaseState & FetchActions & EntityActi
     kbArticles: [],
     movements: [],
     auditLog: [],
+    reportPresets: [],
 
     // Справочники грузятся целиком — их размер ограничен штатом и структурой.
     // Табель и архив сюда не входят: они растут линейно по времени, и их

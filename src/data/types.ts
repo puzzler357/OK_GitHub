@@ -156,6 +156,14 @@ export interface AuditEntry {
   diff?: string;
 }
 
+/** Сохранённая настройка конструктора отчётов. */
+export interface ReportPreset {
+  id: string;
+  name: string;
+  /** JSON: источник, выбранные поля, фильтры, группировка. */
+  config: string;
+}
+
 export interface KbCategory {
   id: string;
   name: string;

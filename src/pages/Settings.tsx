@@ -19,6 +19,7 @@ export default function Settings() {
   const {
     currencySymbol, currencyPosition, currencyDecimals, thousandsSeparator,
     setCurrencySymbol, setCurrencyPosition, setCurrencyDecimals, setThousandsSeparator,
+    docxTemplatePath, setDocxTemplatePath,
   } = useAppStore();
   const money = useMoney();
   const [activeTab, setActiveTab] = useState('general');
@@ -136,6 +137,17 @@ export default function Settings() {
                     <option value="tk">Türkmençe</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-secondary">{t('docgen.docxTemplate')}</label>
+                  <input
+                    type="text"
+                    value={docxTemplatePath}
+                    onChange={(e) => { setDocxTemplatePath(e.target.value); logSetting('docxTemplatePath', e.target.value); }}
+                    className="w-full bg-surface border border-line rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                  />
+                  <p className="text-xs text-muted mt-2">{t('docgen.docxHint')}</p>
+                </div>
+
                 <div className="pt-2 border-t border-[var(--border-color)]">
                   <h4 className="text-sm font-semibold text-primary mt-4 mb-4">{t('settings.currency.title')}</h4>
 

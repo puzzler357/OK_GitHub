@@ -35,6 +35,12 @@ export interface EntityDef {
   orderBy?: string;
   /** Имя массива в useDatabaseStore. */
   stateKey: string;
+  /**
+   * Таблица наполняется работой приложения, а не посевом: журнал аудита
+   * пишется сам, наборы конструктора создаёт пользователь. Выдуманные записи
+   * здесь были бы ложью о том, что происходило в системе.
+   */
+  selfFilling?: boolean;
 }
 
 const text = (field: string, column: string, notNull = true): ColumnDef =>
@@ -143,6 +149,7 @@ export const ENTITIES: EntityDef[] = [
   },
   {
     table: 'audit_log',
+    selfFilling: true,
     stateKey: 'auditLog',
     route: 'audit-log',
     orderBy: 'ts DESC',
@@ -153,6 +160,18 @@ export const ENTITIES: EntityDef[] = [
       text('entity', 'entity'),
       text('entityId', 'entity_id', false),
       text('diff', 'diff', false),
+    ],
+  },
+  {
+    table: 'report_presets',
+    selfFilling: true,
+    stateKey: 'reportPresets',
+    route: 'report-presets',
+    orderBy: 'name ASC',
+    columns: [
+      text('name', 'name'),
+      // JSON с настройками конструктора: источник, поля, фильтры, группировка.
+      text('config', 'config'),
     ],
   },
   {
@@ -186,6 +205,9 @@ export const ENTITY_BY_TABLE = new Map(ENTITIES.map((e) => [e.table, e]));
 /** Таблица журнала: её изменения в журнал не пишутся, иначе он зациклится. */
 export const AUDIT_TABLE = 'audit_log';
 
+/** Сущности, которым положен посев. */
+export const SEEDED_ENTITIES = ENTITIES.filter((e) => !e.selfFilling);
+
 /** Имена таблиц для экранов — чтобы не разбрасывать строковые литералы. */
 export const TABLES = {
   candidates: 'candidates',
@@ -195,6 +217,7 @@ export const TABLES = {
   reviews: 'reviews',
   movements: 'movements',
   auditLog: 'audit_log',
+  reportPresets: 'report_presets',
   kbCategories: 'kb_categories',
   kbArticles: 'kb_articles',
 } as const;

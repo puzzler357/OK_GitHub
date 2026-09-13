@@ -3,11 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { useDatabaseStore } from '../store/useDatabaseStore';
 import { useMoney } from '../lib/money';
 import { FileText, Download, Printer, User } from 'lucide-react';
+import { generateDocx } from '../lib/docx';
+import { useAppStore } from '../store/useAppStore';
 
 export default function DocumentGenerator() {
   const { t } = useTranslation();
   const { templates, employees } = useDatabaseStore();
   const money = useMoney();
+  const docxTemplatePath = useAppStore((s) => s.docxTemplatePath);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [variables, setVariables] = useState<Record<string, string>>({});
@@ -17,6 +20,43 @@ export default function DocumentGenerator() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  /** Подстановка переменной: сначала введённое вручную, потом карточка сотрудника. */
+  const resolveVar = (name: string): string => {
+    if (variables[name] !== undefined && variables[name] !== '') return variables[name];
+    if (!employee) return '';
+    if (name === 'fullName' || name === 'ФИО') return employee.fullName;
+    if (name === 'position' || name === 'Должность') return employee.position;
+    if (name === 'department' || name === 'Отдел') return employee.department;
+    if (name === 'salary' || name === 'Оклад') return money.format(employee.salary ?? 0);
+    return '';
+  };
+
+  // Текст документа без разметки — то же, что видно в предпросмотре.
+  const plainParagraphs = (): { text: string }[] => {
+    if (!template) return [];
+    return template.blocks
+      .filter(block => block.type !== 'signature' && block.type !== 'table')
+      .map(block => ({
+        text: (block.content || '').replace(/\{\{(.*?)\}\}/g, (_m, name) => resolveVar(name.trim())),
+      }))
+      .filter(p => p.text.trim() !== '');
+  };
+
+  const handleDownloadDocx = async () => {
+    if (!template) return;
+    try {
+      await generateDocx(docxTemplatePath, {
+        orgName: 'HRDesk',
+        title: template.name,
+        date: new Date().toLocaleDateString(),
+        paragraphs: plainParagraphs(),
+      }, `${template.name}.docx`);
+    } catch {
+      // generateDocx уже пишет причину в консоль; пользователю нужен факт.
+      alert(t('docgen.docxHint'));
+    }
   };
 
   const renderContent = () => {
@@ -80,14 +120,24 @@ export default function DocumentGenerator() {
           <h2 className="text-2xl font-bold tracking-tight text-primary">{t('docgen.title')}</h2>
           <p className="text-muted mt-1">{t('docgen.subtitle')}</p>
         </div>
-        <button
-          onClick={handlePrint}
-          disabled={!template}
-          className="bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-medium transition-colors"
-        >
-          <Printer className="w-4 h-4" />
-          {t('docgen.printPdf')}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleDownloadDocx}
+            disabled={!template}
+            className="bg-surface-3 border border-line hover:bg-surface-hover disabled:opacity-50 text-secondary px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-medium transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            {t('docgen.downloadDocx')}
+          </button>
+          <button
+            onClick={handlePrint}
+            disabled={!template}
+            className="bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-medium transition-colors"
+          >
+            <Printer className="w-4 h-4" />
+            {t('docgen.printPdf')}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

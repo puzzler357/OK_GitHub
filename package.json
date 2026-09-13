@@ -18,6 +18,7 @@
     "verify": "npm run lint && npm run build && npm run test && npm run test:e2e",
     "start": "node dist/server.cjs",
     "seed:load": "tsx scripts/seedLoad.ts",
+    "make:docx": "tsx scripts/makeDocxTemplate.ts",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"

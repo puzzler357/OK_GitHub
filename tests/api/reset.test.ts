@@ -2,7 +2,7 @@
 import './resetDbPath';
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
 import { api, startApi, stopApi } from './helpers';
-import { ENTITIES } from '../../src/data/entities';
+import { SEEDED_ENTITIES } from '../../src/data/entities';
 
 // Файл работает на собственной базе (см. resetDbPath.ts): он чистит все
 // таблицы, а посев выполняется один раз за жизнь файла БД. На общей базе он
@@ -45,7 +45,7 @@ describe('POST /api/auth/reset-system', () => {
     // они наполняются посевом и попадают в RESETTABLE_TABLES.
     const routes = [
       '/api/employees', '/api/departments', '/api/positions', '/api/templates', '/api/timesheets', '/api/archives',
-      ...ENTITIES.map((e) => `/api/${e.route}`),
+      ...SEEDED_ENTITIES.map((e) => `/api/${e.route}`),
     ];
     for (const route of routes) {
       expect((await api('GET', route)).body.length).toBeGreaterThan(0);

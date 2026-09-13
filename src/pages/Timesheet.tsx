@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { exportToExcel } from '../lib/excel';
 import { useTranslation } from 'react-i18next';
 import { Clock, Calendar as CalendarIcon, Save, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { useDatabaseStore } from '../store/useDatabaseStore';
@@ -53,6 +54,39 @@ export default function Timesheet() {
   }, [year, month, employees, timesheets]);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // Выгрузка: дни месяца по колонкам, итоги справа — тот же расчёт, что и
+  // на экране. Кнопка «Скачать» раньше не была подключена вовсе.
+  const handleDownload = async () => {
+    const monthNamesForFile = t('timesheet.months', { returnObjects: true }) as string[];
+
+    const rows = filteredEmployees.map(emp => {
+      const days = localDays[emp.id] || {};
+      const row: Record<string, string | number> = {
+        [t('timeoff.colEmployee')]: emp.fullName,
+        [t('employees.col.position')]: emp.position,
+      };
+
+      let workDays = 0;
+      let hours = 0;
+      for (let day = 1; day <= daysInMonth; day += 1) {
+        const date = new Date(year, month, day);
+        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+        const code = days[day] !== undefined ? days[day] : (isWeekend ? 'В' : 'Я');
+        row[String(day)] = code;
+        if (code === 'Я' || code === 'К' || code === 'ВМ') {
+          workDays += 1;
+          hours += ATTENDANCE_CODES[code as keyof typeof ATTENDANCE_CODES]?.hours || 0;
+        }
+      }
+
+      row[t('timesheet.colWorked')] = workDays;
+      row[t('timesheet.colHours')] = hours;
+      return row;
+    });
+
+    await exportToExcel(rows, `Timesheet-${year}-${monthNamesForFile[month]}`);
+  };
 
   // Самый тяжёлый экран приложения: 10 000 сотрудников на 31 колонку дней —
   // это больше 300 000 узлов DOM. Виртуализируем строки; закреплённые слева
@@ -161,6 +195,7 @@ export default function Timesheet() {
         </div>
         <div className="flex items-center gap-3">
           <button
+            onClick={handleDownload}
             className="flex items-center gap-2 bg-surface-3 hover:bg-surface-hover text-secondary px-4 py-2 rounded-xl text-sm font-medium transition-colors"
           >
             <Download className="w-4 h-4" />

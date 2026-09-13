@@ -84,6 +84,7 @@ tests/e2e/       Playwright: сценарии в браузере
 | `npm run tauri:dev` | Настольное приложение в режиме разработки |
 | `npm run tauri:build` | Сборка инсталлятора (NSIS, MSI) |
 | `npm run lint` | Проверка типов `tsc --noEmit`, включая тесты |
+| `npm run make:docx` | Пересобирает бланк `public/templates/blank.docx` из разметки в `scripts/makeDocxTemplate.ts` |
 | `npm run seed:load` | Наполняет базу боевым объёмом (10 000 сотрудников и год табеля) для замеров производительности. Флаги: `--employees=N`, `--year=YYYY`, `--no-timesheets`, `--db=путь` |
 
 ## Проверка (тесты)

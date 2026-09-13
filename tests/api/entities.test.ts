@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
 import { api, startApi, stopApi } from './helpers';
-import { ENTITIES, AUDIT_TABLE } from '../../src/data/entities';
+import { ENTITIES, SEEDED_ENTITIES } from '../../src/data/entities';
 
 beforeAll(async () => {
   await startApi();
@@ -75,9 +75,9 @@ describe('булевы поля', () => {
 
 describe('посев экранов', () => {
   it('заполняет таблицы экранов, чтобы они не открывались пустыми', async () => {
-    // Журнал аудита в посев не входит намеренно: он наполняется сам, а
-    // выдуманная история действий была бы прямой ложью о том, что произошло.
-    for (const entity of ENTITIES.filter((e) => e.table !== AUDIT_TABLE)) {
+    // Таблицы, помеченные selfFilling, в посев не входят намеренно: журнал
+    // пишется сам, наборы конструктора создаёт пользователь.
+    for (const entity of SEEDED_ENTITIES) {
       const { body } = await api('GET', `/api/${entity.route}`);
       expect(body.length, `таблица ${entity.table} пуста`).toBeGreaterThan(0);
     }
