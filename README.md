@@ -1,23 +1,87 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# HRDesk
 
-# Run and deploy your AI Studio app
+Локальная HR-система: учёт сотрудников, оргструктура, табель, кадровые документы и отчётность.
+Работает в двух режимах — как настольное приложение (Tauri, Windows) и как веб-приложение с
+локальным Express-бэкендом. Данные всегда хранятся локально в SQLite, без внешних сервисов.
 
-This contains everything you need to run your app locally.
+## Стек
 
-View your app in AI Studio: https://ai.studio/apps/e8ceac13-64d1-4be5-9d87-4e6db284d5b7
+| Слой | Технологии |
+|---|---|
+| Фронтенд | React 19, Vite 6, TypeScript, Tailwind CSS 4, React Router 7 |
+| Состояние и данные | TanStack Query, Zustand-стор (`src/store`), React Hook Form + Zod |
+| Настольное приложение | Tauri 2 (`@tauri-apps/plugin-sql` → SQLite) |
+| Веб-режим | Express 4 + better-sqlite3, JWT, bcryptjs |
+| Документы | docxtemplater + PizZip (DOCX), ExcelJS (XLSX), html2pdf.js (PDF) |
+| Интерфейс | i18next: русский (по умолчанию), английский, туркменский |
+| Тесты | Vitest (API), Playwright (e2e) |
 
-## Run Locally
+## Архитектура доступа к данным
 
-**Prerequisites:**  Node.js
+Единая точка входа — [src/data/index.ts](src/data/index.ts). Она определяет среду выполнения и
+выбирает бэкенд:
 
+- **В Tauri** (`__TAURI_INTERNALS__` в `window`) вызовы идут напрямую в локальную SQLite
+  через [src/data/tauriDb.ts](src/data/tauriDb.ts).
+- **В браузере** те же вызовы уходят по HTTP на `/api/*` к Express-серверу [server.ts](server.ts),
+  который работает с той же схемой через [src/db/sqlite.ts](src/db/sqlite.ts).
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Благодаря этому страницы не знают, в каком режиме они запущены, а бизнес-логика не дублируется.
+
+## Быстрый старт
+
+**Требования:** Node.js 18+. Для сборки настольного приложения дополнительно — Rust и
+[системные зависимости Tauri](https://tauri.app/start/prerequisites/).
+
+```bash
+npm install
+npm run dev          # веб-режим: Express + Vite на http://localhost:3000
+# или
+npm run tauri:dev    # настольное приложение
+```
+
+При первом запуске база создаётся и наполняется автоматически. Учётная запись по умолчанию:
+
+```
+admin@global.tech / password123
+```
+
+> Это сид для разработки, заданный в [src/db/sqlite.ts](src/db/sqlite.ts). Смените пароль
+> сразу после первого входа — в приложении есть форма смены пароля и сброс системы.
+
+Переменные окружения — см. [.env.example](.env.example); локальные значения кладите в `.env.local`
+(файлы `.env*` не попадают в git).
+
+## Структура проекта
+
+```
+src/
+  pages/         19 страниц: Dashboard, Employees, OrgChart, Timesheet, Templates,
+                 DocumentGenerator, Reports, Recruiting, Onboarding, Performance,
+                 TimeOff, Movements, Archive, KnowledgeBase, CalendarView, Settings, …
+  components/    Layout и формы сотрудника
+  data/          слой доступа к данным (Tauri ↔ REST) и типы
+  db/            схема SQLite и сид
+  lib/           генерация DOCX / XLSX, утилиты
+  locales/       ru, en, tk
+  store/         клиентское состояние
+server.ts        Express REST API для веб-режима
+src-tauri/       Rust-обвязка Tauri, конфиг и иконки (сборка: NSIS + MSI)
+tests/api/       Vitest: REST API
+tests/e2e/       Playwright: сценарии в браузере
+```
+
+## Скрипты
+
+| Команда | Что делает |
+|---|---|
+| `npm run dev` | Express + отдача клиента, порт 3000 |
+| `npm run dev:client` | Только Vite dev-сервер (порт 5173) |
+| `npm run build` | Сборка клиента (Vite) и сервера (esbuild → `dist/server.cjs`) |
+| `npm start` | Запуск собранного сервера |
+| `npm run tauri:dev` | Настольное приложение в режиме разработки |
+| `npm run tauri:build` | Сборка инсталлятора (NSIS, MSI) |
+| `npm run lint` | Проверка типов `tsc --noEmit`, включая тесты |
 
 ## Проверка (тесты)
 
@@ -40,25 +104,14 @@ npm run verify
 | `npm run test:e2e` | Playwright: логин, обход всех 18 страниц + навигация по меню, отлов ошибок консоли и неуспешных запросов |
 | `npm run test:e2e:ui` | Playwright в интерактивном режиме |
 
-Перед первым запуском e2e нужно один раз скачать браузер:
+E2E поднимают отдельный сервер на изолированной базе, поэтому рабочие данные не затрагиваются.
 
-```bash
-npx playwright install chromium
-```
+## Документация
 
-### Изоляция данных
-
-Тесты никогда не трогают рабочую `local-hr-docs.db`: путь к базе задаётся
-переменной `DB_PATH`, и оба набора тестов поднимают собственную временную базу
-в `tests/.tmp/`, засеянную данными по умолчанию. HTML-отчёт Playwright после
-прогона лежит в `tests/.tmp/playwright-report/index.html`.
-
-### Ручной сценарий
-
-Автотесты проверяют, что экраны открываются и API отвечает. Правильность расчётов, сохранность данных и читаемость интерфейса проверяются вручную по сценарию [TEST_SCENARIO.md](TEST_SCENARIO.md) — 148 шагов на данных вымышленной организации, полное прохождение 90–120 минут.
-
-### Что тесты НЕ покрывают
-
-Нативную сборку (Tauri) — там данные идут не через Express, а напрямую в SQLite
-через `src/data/tauriDb.ts`. Её по-прежнему нужно проверять руками:
-`npm run tauri:dev`.
+| Файл | Содержание |
+|---|---|
+| [TZ.md](TZ.md) | Техническое задание |
+| [TZ_AUDIT.md](TZ_AUDIT.md) | Сверка реализации с ТЗ |
+| [AUDIT_REPORT.md](AUDIT_REPORT.md) | Отчёт по аудиту кода |
+| [TEST_SCENARIO.md](TEST_SCENARIO.md) | Ручные тестовые сценарии |
+| [BUILD_PROMPT.md](BUILD_PROMPT.md), [BUILD_PROMPT.v2.md](BUILD_PROMPT.v2.md) | Постановка для генерации приложения |
