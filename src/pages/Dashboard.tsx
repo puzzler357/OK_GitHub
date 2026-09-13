@@ -5,6 +5,7 @@ import { Users, FileText, Network, BarChart as BarChartIcon, Gift } from 'lucide
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useDatabaseStore } from '../store/useDatabaseStore';
 import { useMoney } from '../lib/money';
+import { payrollTotal } from '../lib/payroll';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#3b82f6', '#ec4899'];
 
@@ -31,15 +32,10 @@ export default function Dashboard() {
     });
   }, [employees]);
 
-    const totalFOT = useMemo(() => {
-    return employees.reduce((acc, emp) => {
-      // For now, simply calculate salary * rate, assuming monthly salary for all.
-      // If hourly, it might need different calculation, but we keep it simple or assume `salary` is monthly.
-      const salary = emp.salary || 85000;
-      const rate = emp.rate || 1;
-      return acc + (salary * rate);
-    }, 0);
-  }, [employees]);
+  // Расчёт вынесен в src/lib/payroll.ts и покрыт тестами. Заодно убрана
+  // подстановка 85 000 каждому сотруднику без оклада: это были выдуманные
+  // деньги в отчётной цифре.
+  const totalFOT = useMemo(() => payrollTotal(employees), [employees]);
 
   const departmentData = useMemo(() => {
     const counts: Record<string, number> = {};

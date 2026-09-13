@@ -4,6 +4,8 @@ import { MoreHorizontal, Edit, Trash, FileText, Printer, X, History } from 'luci
 import { useDatabaseStore, Employee, Template } from '../store/useDatabaseStore';
 import EmployeeForm from './EmployeeForm';
 import EmployeeHistory from './EmployeeHistory';
+import { renderTemplate } from '../lib/templateVars';
+import { useAppStore } from '../store/useAppStore';
 
 export default function EmployeeActions({ employee }: { employee: Employee }) {
   const { t } = useTranslation();
@@ -104,18 +106,20 @@ export default function EmployeeActions({ employee }: { employee: Employee }) {
 
 function DocModal({ employee, templates, onClose }: { employee: Employee, templates: Template[], onClose: () => void }) {
   const { t } = useTranslation();
+  const orgName = useAppStore((s) => s.orgName);
   const [selectedTemplateId, setSelectedTemplateId] = useState(templates[0]?.id || '');
 
   const template = templates.find(t => t.id === selectedTemplateId);
 
-  const processTemplate = (content: string) => {
-    let processed = content;
-    processed = processed.replace(/\{\{fullName\}\}/g, employee.fullName);
-    processed = processed.replace(/\{\{position\}\}/g, employee.position);
-    processed = processed.replace(/\{\{department\}\}/g, employee.department);
-    processed = processed.replace(/\{\{hireDate\}\}/g, new Date(employee.hireDate).toLocaleDateString());
-    return processed;
-  };
+  // Подстановка та же, что в «Генерации документов»: раньше здесь был свой
+  // набор замен, понимавший меньше переменных.
+  const processTemplate = (content: string) => renderTemplate(content, {
+    fullName: employee.fullName,
+    position: employee.position,
+    department: employee.department,
+    hireDate: new Date(employee.hireDate).toLocaleDateString(),
+    orgName,
+  });
 
   const handlePrint = () => {
     const printWindow = window.open('', '', 'width=800,height=600');

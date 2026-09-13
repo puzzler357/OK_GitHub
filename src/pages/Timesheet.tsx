@@ -1,24 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { exportToExcel } from '../lib/excel';
+import { ATTENDANCE_CODES, codeForDay, timesheetTotals } from '../lib/timesheet';
 import { useTranslation } from 'react-i18next';
 import { Clock, Calendar as CalendarIcon, Save, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { useDatabaseStore } from '../store/useDatabaseStore';
 
-// Коды формы Т-13 (буквенные обозначения — доменный стандарт, не переводятся).
-// Подписи для легенды берутся из i18n (timesheet.codes.*).
-const ATTENDANCE_CODES = {
-  'Я': { hours: 8, color: 'text-primary' },
-  'В': { hours: 0, color: 'text-rose-400 bg-rose-500/10' },
-  'ОТ': { hours: 0, color: 'text-blue-400 bg-blue-500/10' },
-  'Б': { hours: 0, color: 'text-amber-400 bg-amber-500/10' },
-  'К': { hours: 8, color: 'text-emerald-400 bg-emerald-500/10' },
-  'ОГ': { hours: 0, color: 'text-teal-400 bg-teal-500/10' },
-  'ВМ': { hours: 11, color: 'text-orange-400 bg-orange-500/10' },
-  'МВ': { hours: 0, color: 'text-indigo-400 bg-indigo-500/10' },
-  'НН': { hours: 0, color: 'text-purple-400 bg-purple-500/10' },
-  'ПР': { hours: 0, color: 'text-rose-500 bg-rose-500/20' },
-};
 
 export default function Timesheet() {
   const { t } = useTranslation();
@@ -67,21 +54,15 @@ export default function Timesheet() {
         [t('employees.col.position')]: emp.position,
       };
 
-      let workDays = 0;
-      let hours = 0;
       for (let day = 1; day <= daysInMonth; day += 1) {
-        const date = new Date(year, month, day);
-        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-        const code = days[day] !== undefined ? days[day] : (isWeekend ? 'В' : 'Я');
-        row[String(day)] = code;
-        if (code === 'Я' || code === 'К' || code === 'ВМ') {
-          workDays += 1;
-          hours += ATTENDANCE_CODES[code as keyof typeof ATTENDANCE_CODES]?.hours || 0;
-        }
+        row[String(day)] = codeForDay(days, year, month, day);
       }
 
-      row[t('timesheet.colWorked')] = workDays;
-      row[t('timesheet.colHours')] = hours;
+      // Итоги считаются тем же кодом, что и на экране: расхождение между
+      // видимой таблицей и выгрузкой — худшее, что может случиться с табелем.
+      const totals = timesheetTotals(days, year, month);
+      row[t('timesheet.colWorked')] = totals.workDays;
+      row[t('timesheet.colHours')] = totals.hours;
       return row;
     });
 
@@ -282,21 +263,8 @@ export default function Timesheet() {
                 const days = localDays[emp.id] || {};
                 
                 // Calculate summaries
-                let totalWorkDays = 0;
-                let totalHours = 0;
-                let workedDaysStr = 0;
-                
-                for (let i = 1; i <= daysInMonth; i++) {
-                  const date = new Date(year, month, i);
-                  const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                  
-                  const code = days[i] !== undefined ? days[i] : (isWeekend ? 'В' : 'Я');
-                  if (code === 'Я' || code === 'К' || code === 'ВМ') {
-                    totalWorkDays++;
-                    totalHours += ATTENDANCE_CODES[code as keyof typeof ATTENDANCE_CODES]?.hours || 0;
-                    if (code === 'Я' || code === 'ВМ') workedDaysStr++;
-                  }
-                }
+                const { workDays: totalWorkDays, attendances: workedDaysStr, hours: totalHours } =
+                  timesheetTotals(days, year, month);
                 
                 return (
                   <tr key={emp.id} className="border-b border-subtle hover:bg-surface-hover group">
@@ -308,9 +276,8 @@ export default function Timesheet() {
                       const day = i + 1;
                       const date = new Date(year, month, day);
                       const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                      const defaultCode = isWeekend ? 'В' : 'Я';
-                      const code = days[day] !== undefined ? days[day] : defaultCode;
-                      const info = ATTENDANCE_CODES[code as keyof typeof ATTENDANCE_CODES] || { color: 'text-muted' };
+                      const code = codeForDay(days, year, month, day);
+                      const info = ATTENDANCE_CODES[code] || { color: 'text-muted' };
                       
                       return (
                         <td 

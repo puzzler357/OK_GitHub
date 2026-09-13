@@ -6,7 +6,9 @@ const testDbPath = path.join(__dirname, 'tests', '.tmp', 'api-test.db');
 
 export default defineConfig({
   test: {
-    include: ['tests/api/**/*.test.ts'],
+    // Модульные тесты проверяют чистые функции и не поднимают ни сервер,
+    // ни браузер; API-тесты работают с отдельным файлом БД.
+    include: ['tests/unit/**/*.test.ts', 'tests/api/**/*.test.ts'],
     environment: 'node',
     globalSetup: ['tests/api/globalSetup.ts'],
     // Файлы тестов пишут в одну и ту же SQLite-базу — гоняем их последовательно.

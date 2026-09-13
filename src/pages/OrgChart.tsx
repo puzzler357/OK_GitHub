@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronRight, Users, Briefcase, Plus, X, Edit, Trash2 } from 'lucide-react';
 import { useDatabaseStore } from '../store/useDatabaseStore';
 import { useMoney } from '../lib/money';
+import { positionStats, staffingSummary } from '../lib/staffing';
 
 export default function OrgChart() {
   const { t } = useTranslation();
@@ -77,36 +78,15 @@ export default function OrgChart() {
     return departments.find(d => d.name === selectedDepartment || d.id === selectedDepartment);
   }, [departments, selectedDepartment]);
 
-  const positionStats = useMemo(() => {
-    const relevantPositions = currentDepartment 
-      ? positions.filter(p => p.departmentId === currentDepartment.id)
-      : positions;
-      
-    return relevantPositions.map(pos => {
-      // Find employees for this position
-      // For global view, we match by position title
-      // For department view, we match by both department and title
-      const occupied = employees.filter(e => {
-        const titleMatch = e.position === pos.title;
-        if (!currentDepartment) return titleMatch; // global view
-        return titleMatch && e.department === currentDepartment.name;
-      }).length;
-      
-      const vacant = Math.max(0, pos.maxCount - occupied);
-      
-      return {
-        position: pos.title,
-        occupied,
-        vacant,
-        total: pos.maxCount,
-        salary: pos.salary
-      };
-    }).sort((a, b) => b.total - a.total);
-  }, [positions, employees, currentDepartment]);
+  // Расчёт занятости вынесен в src/lib/staffing.ts: он же используется в
+  // отчёте по штатной расстановке, и держать две слегка разные версии
+  // было нечем оправдать.
+  const stats = useMemo(
+    () => positionStats(positions, employees, departments, currentDepartment?.id ?? null),
+    [positions, employees, departments, currentDepartment],
+  );
 
-  const totalPositions = useMemo(() => positionStats.reduce((sum, p) => sum + p.total, 0), [positionStats]);
-  const totalOccupied = positionStats.reduce((sum, p) => sum + p.occupied, 0);
-  const totalVacant = totalPositions - totalOccupied;
+  const { total: totalPositions, occupied: totalOccupied, vacant: totalVacant } = staffingSummary(stats);
 
   // Рекурсивный рендер: раньше здесь был плоский список с условием
   // `d.parentId === 'd1' || d.parentId !== null`, пропускавшим любой узел
@@ -243,18 +223,18 @@ export default function OrgChart() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border-color)]">
-                  {positionStats.length === 0 ? (
+                  {stats.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="p-table text-table text-center text-muted py-8">
                         {t('orgchart.noData')}
                       </td>
                     </tr>
                   ) : (
-                    positionStats.map((pos, idx) => (
+                    stats.map((pos, idx) => (
                       <tr key={idx} className="hover:bg-surface-hover dark:hover:bg-slate-900 transition-colors group">
                         <td className="p-table text-table font-medium">
                           <div className="flex items-center justify-between">
-                            <span>{pos.position}</span>
+                            <span>{pos.title}</span>
                             <div className="hidden group-hover:flex items-center gap-1">
                                {/* Edit/Delete mock UI */}
                             </div>

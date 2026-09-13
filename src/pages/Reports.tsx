@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Users, TrendingDown, ClipboardList, BarChart as BarChartIcon, Download, Save } from 'lucide-react';
 import { exportToExcel } from '../lib/excel';
 import { useMoney } from '../lib/money';
+import { positionStats } from '../lib/staffing';
+import { timesheetTotals } from '../lib/timesheet';
 import { useDatabaseStore, TABLES } from '../store/useDatabaseStore';
 import type { ReportPreset } from '../store/useDatabaseStore';
 
@@ -128,16 +130,14 @@ export default function Reports() {
         ],
         rows: employees.map(emp => {
           const record = timesheets.find(ts => ts.employeeId === emp.id);
-          const days = record?.days ?? {};
-          let worked = 0;
-          let absent = 0;
-          for (let day = 1; day <= daysInMonth; day += 1) {
-            const code = (days as Record<number, string>)[day];
-            if (!code) continue;
-            if (code === 'Я' || code === 'К' || code === 'ВМ') worked += 1;
-            else if (code !== 'В') absent += 1;
-          }
-          return { fullName: emp.fullName, worked, absent };
+          // Тот же расчёт, что на экране табеля: отчёт не должен показывать
+          // другие цифры по тем же данным.
+          const totals = timesheetTotals(record?.days ?? {}, period.year, period.month);
+          return {
+            fullName: emp.fullName,
+            worked: totals.workDays,
+            absent: daysInMonth - totals.workDays,
+          };
         }),
       };
     }
@@ -175,18 +175,15 @@ export default function Reports() {
         { key: 'vacant', label: t('orgchart.vacant') },
         { key: 'salary', label: t('employees.col.salary') },
       ],
-      rows: positions.map(pos => {
-        const depName = departmentName(pos.departmentId);
-        const occupied = employees.filter(e => e.position === pos.title && e.department === depName).length;
-        return {
-          department: depName,
-          position: pos.title,
-          total: pos.maxCount,
-          occupied,
-          vacant: Math.max(0, pos.maxCount - occupied),
-          salary: money.format(pos.salary),
-        };
-      }),
+      // Занятость считается тем же кодом, что и в оргструктуре.
+      rows: positionStats(positions, employees, departments).map(stat => ({
+        department: stat.department,
+        position: stat.title,
+        total: stat.total,
+        occupied: stat.occupied,
+        vacant: stat.vacant,
+        salary: money.format(stat.salary),
+      })),
     };
   }, [selectedReport, employees, positions, departments, timesheets, movements, period, monthNames, money, t]);
 

@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDatabaseStore } from '../store/useDatabaseStore';
 import { useMoney } from '../lib/money';
+import { canonicalName, renderTemplate } from '../lib/templateVars';
+import type { TemplateValues } from '../lib/templateVars';
 import { FileText, Download, Printer, User } from 'lucide-react';
 import { generateDocx } from '../lib/docx';
 import { useAppStore } from '../store/useAppStore';
@@ -23,25 +25,33 @@ export default function DocumentGenerator() {
     window.print();
   };
 
-  /** Подстановка переменной: сначала введённое вручную, потом карточка сотрудника. */
-  const resolveVar = (name: string): string => {
-    if (variables[name] !== undefined && variables[name] !== '') return variables[name];
-    if (!employee) return '';
-    if (name === 'fullName' || name === 'ФИО') return employee.fullName;
-    if (name === 'position' || name === 'Должность') return employee.position;
-    if (name === 'department' || name === 'Отдел') return employee.department;
-    if (name === 'salary' || name === 'Оклад') return money.format(employee.salary ?? 0);
-    return '';
-  };
+  /**
+   * Значения переменных: введённое вручную важнее карточки сотрудника —
+   * человек правит поле именно тогда, когда карточка его не устраивает.
+   */
+  const templateValues = useMemo((): TemplateValues => {
+    const fromEmployee: TemplateValues = employee ? {
+      fullName: employee.fullName,
+      position: employee.position,
+      department: employee.department,
+      salary: money.format(employee.salary ?? 0),
+      hireDate: employee.hireDate,
+    } : {};
+
+    const manual: TemplateValues = {};
+    for (const [name, value] of Object.entries(variables)) {
+      if (value !== '') manual[canonicalName(name)] = value;
+    }
+
+    return { ...fromEmployee, orgName, ...manual };
+  }, [employee, variables, money, orgName]);
 
   // Текст документа без разметки — то же, что видно в предпросмотре.
   const plainParagraphs = (): { text: string }[] => {
     if (!template) return [];
     return template.blocks
       .filter(block => block.type !== 'signature' && block.type !== 'table')
-      .map(block => ({
-        text: (block.content || '').replace(/\{\{(.*?)\}\}/g, (_m, name) => resolveVar(name.trim())),
-      }))
+      .map(block => ({ text: renderTemplate(block.content || '', templateValues) }))
       .filter(p => p.text.trim() !== '');
   };
 
@@ -90,24 +100,7 @@ export default function DocumentGenerator() {
         return;
       }
 
-      let text = block.content || '';
-
-      // Try replacing the real variables:
-      const matches = text.match(/\{\{.*?\}\}/g);
-      if (matches) {
-        matches.forEach(m => {
-          const varName = m.replace(/\{\{|\}\}/g, '');
-          if (variables[varName] !== undefined && variables[varName] !== '') {
-             text = text.replace(m, variables[varName]);
-          } else if (employee) {
-             if (varName === 'fullName' || varName === 'ФИО') text = text.replace(m, employee.fullName);
-             if (varName === 'position' || varName === 'Должность') text = text.replace(m, employee.position);
-             if (varName === 'department' || varName === 'Отдел') text = text.replace(m, employee.department);
-             if (varName === 'salary' || varName === 'Оклад') text = text.replace(m, money.format(employee.salary ?? 0));
-          }
-        });
-      }
-
+      const text = renderTemplate(block.content || '', templateValues);
       contentHtml += `<p style="margin-bottom: 1rem; text-align: left">${text}</p>`;
     });
 

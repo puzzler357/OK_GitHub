@@ -1,39 +1,60 @@
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 
-export const exportToExcel = async (data: any[], filename: string) => {
+/**
+ * Собирает книгу Excel из массива объектов.
+ *
+ * Отделено от скачивания намеренно: сборка — чистая функция, её можно
+ * проверить тестом без браузера, а скачивание требует DOM и проверяется
+ * только руками.
+ */
+export const buildWorkbook = async (data: Record<string, unknown>[]): Promise<ArrayBuffer | null> => {
+  if (data.length === 0) return null;
+
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Data');
 
-  if (data.length === 0) return;
-
-  // Generate headers
-  const headers = Object.keys(data[0]);
+  // Заголовки собираем по всем строкам: у разреженных данных первая строка
+  // может не содержать всех колонок, и они потерялись бы молча.
+  const headers = Array.from(new Set(data.flatMap(item => Object.keys(item))));
   worksheet.addRow(headers);
 
-  // Add data
   data.forEach(item => {
-    worksheet.addRow(headers.map(h => item[h]));
+    worksheet.addRow(headers.map(h => item[h] ?? null));
   });
 
-  // Style header
   worksheet.getRow(1).font = { bold: true };
-  
-  // Auto-fit columns
   worksheet.columns.forEach(column => {
     column.width = 20;
   });
 
-  const buffer = await workbook.xlsx.writeBuffer();
+  return workbook.xlsx.writeBuffer() as Promise<ArrayBuffer>;
+};
+
+export const exportToExcel = async (data: any[], filename: string) => {
+  const buffer = await buildWorkbook(data);
+  if (!buffer) return;
+
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = window.URL.createObjectURL(blob);
-  
+
   const link = document.createElement('a');
   link.href = url;
   link.download = `${filename}.xlsx`;
   link.click();
-  
+
   window.URL.revokeObjectURL(url);
+};
+
+/**
+ * Разбирает содержимое книги в массив строк. Вынесено из parseExcel по той же
+ * причине: чтение файла требует браузера, разбор — нет.
+ */
+export const parseWorkbook = (data: ArrayBuffer | Uint8Array | string, type: 'binary' | 'array' = 'binary'): any[] => {
+  const workbook = XLSX.read(data, { type });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) return [];
+  return XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName]);
 };
 
 export const parseExcel = async (file: File): Promise<any[]> => {
@@ -41,12 +62,7 @@ export const parseExcel = async (file: File): Promise<any[]> => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const json = XLSX.utils.sheet_to_json(worksheet);
-        resolve(json);
+        resolve(parseWorkbook(e.target?.result as string));
       } catch (err) {
         reject(err);
       }

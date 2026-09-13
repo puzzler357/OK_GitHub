@@ -1,15 +1,17 @@
 // Реализация доступа к данным для нативного приложения (Tauri).
 // Работает напрямую с локальной SQLite через @tauri-apps/plugin-sql —
-// без сети, без сервера. Схема и первичные данные создаются здесь же.
+// без сети, без сервера. Схема, миграции и первичные данные общие с
+// веб-режимом: src/data/schema.ts и src/data/seedData.ts.
 import Database from '@tauri-apps/plugin-sql';
 import bcrypt from 'bcryptjs';
 import type {
   Employee, Department, Position, TimesheetRecord, ArchiveRecord, ArchiveFilters, Template, LoginResult,
 } from './types';
 import {
-  ENTITIES, ENTITY_BY_TABLE, AUDIT_TABLE, BACKUP_TABLES, allSchemaSql, insertSql, selectSql, updateSql, rowToObject, objectToValues,
+  ENTITIES, ENTITY_BY_TABLE, AUDIT_TABLE, BACKUP_TABLES, insertSql, selectSql, updateSql, rowToObject, objectToValues,
 } from './entities';
-import { seedValues } from './seedData';
+import { MIGRATIONS_TABLE_SQL, pendingMigrations } from './schema';
+import { CORE_SEED, seedValues } from './seedData';
 import { employeePatchFor, employeeUpdate } from './movements';
 
 const DB_URL = 'sqlite:local-hr-docs.db';
@@ -19,7 +21,7 @@ let dbPromise: Promise<Database> | null = null;
 function getDb(): Promise<Database> {
   if (!dbPromise) {
     dbPromise = Database.load(DB_URL).then(async (db) => {
-      await initSchema(db);
+      await migrate(db);
       await seedIfEmpty(db);
       return db;
     });
@@ -27,99 +29,55 @@ function getDb(): Promise<Database> {
   return dbPromise;
 }
 
-async function initSchema(db: Database) {
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      role TEXT NOT NULL,
-      name TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS employees (
-      id TEXT PRIMARY KEY,
-      full_name TEXT NOT NULL,
-      position TEXT NOT NULL,
-      department TEXT NOT NULL,
-      status TEXT NOT NULL,
-      hire_date TEXT NOT NULL,
-      tab_number TEXT,
-      birth_date TEXT,
-      payment_type TEXT DEFAULT 'salary',
-      salary REAL DEFAULT 0,
-      rate REAL DEFAULT 1
-    );
-    CREATE TABLE IF NOT EXISTS departments (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      parent_id TEXT
-    );
-    CREATE TABLE IF NOT EXISTS positions (
-      id TEXT PRIMARY KEY,
-      department_id TEXT NOT NULL,
-      title TEXT NOT NULL,
-      max_count INTEGER NOT NULL,
-      salary REAL NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS templates (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      blocks TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS timesheets (
-      id TEXT PRIMARY KEY,
-      year INTEGER NOT NULL,
-      month INTEGER NOT NULL,
-      employee_id TEXT NOT NULL,
-      days TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS archives (
-      id TEXT PRIMARY KEY,
-      year INTEGER NOT NULL,
-      month INTEGER NOT NULL,
-      employee_id TEXT NOT NULL,
-      employee_name TEXT NOT NULL,
-      department TEXT NOT NULL,
-      position TEXT NOT NULL,
-      salary REAL NOT NULL,
-      hours_worked REAL NOT NULL
-    );
-    -- Служебные флаги; сейчас хранит отметку о первичном посеве.
-    CREATE TABLE IF NOT EXISTS meta (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
+// --- Миграции ---------------------------------------------------------------
+// Схема и список миграций общие с веб-режимом (src/data/schema.ts).
+// Здесь только исполнитель: он знает, как выполнить шаг через plugin-sql.
 
-    -- Индексы под выборки по срезу и фильтры экранов. Без них каждый запрос
-    -- по году/месяцу или подразделению — полное сканирование таблицы.
-    CREATE INDEX IF NOT EXISTS idx_employees_department ON employees(department);
-    CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(status);
-    CREATE INDEX IF NOT EXISTS idx_timesheets_period ON timesheets(year, month);
-    CREATE INDEX IF NOT EXISTS idx_timesheets_employee ON timesheets(employee_id);
-    CREATE INDEX IF NOT EXISTS idx_archives_year ON archives(year);
-    CREATE INDEX IF NOT EXISTS idx_archives_employee ON archives(employee_id);
-    CREATE INDEX IF NOT EXISTS idx_archives_department ON archives(department);
-    CREATE INDEX IF NOT EXISTS idx_positions_department ON positions(department_id);
-    CREATE INDEX IF NOT EXISTS idx_departments_parent ON departments(parent_id);
-    ${allSchemaSql()}
-  `);
+async function appliedVersion(db: Database): Promise<number> {
+  const rows = await db.select<{ v: number | null }[]>('SELECT max(version) as v FROM _migrations');
+  return rows[0]?.v ?? 0;
+}
 
-  // База, созданная предыдущей версией схемы, колонки tab_number не имеет.
-  const columns = await db.select<{ name: string }[]>('PRAGMA table_info(employees)');
-  if (!columns.some((c) => c.name === 'tab_number')) {
-    await db.execute('ALTER TABLE employees ADD COLUMN tab_number TEXT');
+async function hasColumn(db: Database, table: string, column: string): Promise<boolean> {
+  const columns = await db.select<{ name: string }[]>(`PRAGMA table_info(${table})`);
+  return columns.some((c) => c.name === column);
+}
+
+async function migrate(db: Database) {
+  await db.execute(MIGRATIONS_TABLE_SQL);
+
+  for (const migration of pendingMigrations(await appliedVersion(db))) {
+    for (const step of migration.steps) {
+      if (step.kind === 'sql') {
+        await db.execute(step.sql);
+        continue;
+      }
+      // Проверка вместо try/catch: колонка могла появиться в базе,
+      // созданной до того, как миграции завелись.
+      if (!(await hasColumn(db, step.table, step.column))) {
+        await db.execute(`ALTER TABLE ${step.table} ADD COLUMN ${step.column} ${step.definition}`);
+      }
+    }
+    await db.execute(
+      'INSERT INTO _migrations (version, name, applied_at) VALUES (?, ?, ?)',
+      [migration.version, migration.name, new Date().toISOString()],
+    );
   }
 }
+
+// --- Первичный посев --------------------------------------------------------
+
+const SEED_FLAG = 'seeded';
 
 async function count(db: Database, table: string): Promise<number> {
   const rows = await db.select<{ c: number }[]>(`SELECT count(*) as c FROM ${table}`);
   return rows[0]?.c ?? 0;
 }
 
-const SEED_FLAG = 'seeded';
-
 // Посев выполняется ровно один раз за жизнь базы. Без отметки в meta сброс
 // системы был бы бессмысленным: демо-данные вернулись бы при следующем запуске.
+// Учётная запись владельца не сеется — пароль по умолчанию в поставке это
+// пароль, который знают все; владелец задаёт его при первом запуске.
 async function seedIfEmpty(db: Database) {
   const flag = await db.select<{ value: string }[]>('SELECT value FROM meta WHERE key = ?', [SEED_FLAG]);
   if (flag.length > 0) return;
@@ -131,74 +89,14 @@ async function seedIfEmpty(db: Database) {
     return;
   }
 
-  // Учётная запись владельца не сеется: пароль по умолчанию в поставке —
-  // это пароль, который знают все. Владелец задаёт его при первом запуске.
-  {
-    const emps: [string, string, string, string, string, string, string][] = [
-      ['1', 'Иванов Иван Иванович', 'Старший разработчик', 'IT', 'active', '2021-03-15', '0001'],
-      ['2', 'Петров Петр Петрович', 'Менеджер по продажам', 'Продажи', 'active', '2022-11-01', '0002'],
-      ['3', 'Смирнова Анна Игоревна', 'HR Специалист', 'HR', 'on_leave', '2020-05-20', '0003'],
-      ['4', 'Аманмурадов Мердан', 'Аналитик данных', 'Аналитика', 'active', '2023-01-10', '0004'],
-      ['5', 'Бердыева Айгуль', 'Junior Дизайнер', 'Дизайн', 'probation', '2024-02-15', '0005'],
-    ];
-    for (const e of emps) {
-      await db.execute(
-        'INSERT INTO employees (id, full_name, position, department, status, hire_date, tab_number) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        e,
-      );
-    }
-  }
-
-  {
-    const deps: [string, string, string | null][] = [
-      ['d1', 'ООО "Глобал Тек"', null],
-      ['d2', 'IT', 'd1'], ['d3', 'Продажи', 'd1'], ['d4', 'HR', 'd1'],
-      ['d5', 'Аналитика', 'd1'], ['d6', 'Дизайн', 'd1'],
-    ];
-    for (const d of deps) {
-      await db.execute('INSERT INTO departments (id, name, parent_id) VALUES (?, ?, ?)', d);
-    }
-  }
-
-  {
-    const pos: [string, string, string, number, number][] = [
-      ['p1', 'd1', 'Генеральный директор', 1, 250000],
-      ['p2', 'd1', 'Финансовый директор', 1, 180000],
-      ['p3', 'd1', 'Главный бухгалтер', 1, 150000],
-      ['p4', 'd2', 'Старший разработчик', 3, 500000],
-      ['p5', 'd2', 'Разработчик', 5, 300000],
-      ['p6', 'd3', 'Менеджер по продажам', 10, 250000],
-      ['p7', 'd4', 'HR Специалист', 2, 180000],
-      ['p8', 'd5', 'Аналитик данных', 3, 250000],
-      ['p9', 'd6', 'Junior Дизайнер', 2, 120000],
-    ];
-    for (const p of pos) {
-      await db.execute('INSERT INTO positions (id, department_id, title, max_count, salary) VALUES (?, ?, ?, ?, ?)', p);
-    }
-  }
-
-  {
-    const blocks = JSON.stringify([{ id: '1', type: 'text', content: 'Справка дана {{fullName}} в том, что он(а) действительно работает в ООО "Глобал Тек" в должности {{position}}.' }]);
-    await db.execute('INSERT INTO templates (id, name, blocks) VALUES (?, ?, ?)', ['1', 'Справка с места работы', blocks]);
-  }
-
-  {
-    const arch: [string, number, number, string, string, string, string, number, number][] = [
-      ['a1', 2023, 12, '1', 'Иванов Иван Иванович', 'IT', 'Старший разработчик', 500000, 160],
-      ['a2', 2023, 12, '2', 'Петров Петр Петрович', 'Продажи', 'Менеджер по продажам', 300000, 150],
-      ['a3', 2023, 11, '1', 'Иванов Иван Иванович', 'IT', 'Старший разработчик', 500000, 168],
-      ['a4', 2023, 11, '2', 'Петров Петр Петрович', 'Продажи', 'Менеджер по продажам', 280000, 160],
-      ['a5', 2022, 12, '1', 'Иванов Иван Иванович', 'IT', 'Разработчик', 400000, 160],
-    ];
-    for (const a of arch) {
-      await db.execute('INSERT INTO archives (id, year, month, employee_id, employee_name, department, position, salary, hours_worked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', a);
-    }
+  for (const { sql, rows } of CORE_SEED) {
+    for (const row of rows) await db.execute(sql, row as unknown[]);
   }
 
   for (const entity of ENTITIES) {
-    const seed = seedValues(entity.table);
-    if (!seed) continue;
-    for (const row of seed.rows) await db.execute(seed.sql, row);
+    const entitySeed = seedValues(entity.table);
+    if (!entitySeed) continue;
+    for (const row of entitySeed.rows) await db.execute(entitySeed.sql, row);
   }
 
   await db.execute('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', [SEED_FLAG, new Date().toISOString()]);
