@@ -1,0 +1,252 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* ——— Семантические цвета дизайн-системы (переключаются по теме) ——— */
+  /* Многоуровневые фоны */
+  --color-app: var(--surface-app);
+  --color-section: var(--surface-section);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-4: var(--surface-4);
+  --color-input: var(--surface-input);
+  --color-surface-hover: var(--surface-hover);
+  /* Границы */
+  --color-line: var(--border-base);
+  --color-subtle: var(--border-subtle);
+  --color-strong: var(--border-strong);
+  /* Текст */
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+
+  --color-accent-50: var(--accent-50);
+  --color-accent-100: var(--accent-100);
+  --color-accent-200: var(--accent-200);
+  --color-accent-300: var(--accent-300);
+  --color-accent-400: var(--accent-400);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-accent-700: var(--accent-700);
+  --color-accent-800: var(--accent-800);
+  --color-accent-900: var(--accent-900);
+}
+
+@layer base {
+  :root, .theme-indigo {
+    --accent-50: var(--color-indigo-50);
+    --accent-100: var(--color-indigo-100);
+    --accent-200: var(--color-indigo-200);
+    --accent-300: var(--color-indigo-300);
+    --accent-400: var(--color-indigo-400);
+    --accent-500: var(--color-indigo-500);
+    --accent-600: var(--color-indigo-600);
+    --accent-700: var(--color-indigo-700);
+    --accent-800: var(--color-indigo-800);
+    --accent-900: var(--color-indigo-900);
+  }
+  .theme-purple {
+    --accent-50: var(--color-purple-50);
+    --accent-100: var(--color-purple-100);
+    --accent-200: var(--color-purple-200);
+    --accent-300: var(--color-purple-300);
+    --accent-400: var(--color-purple-400);
+    --accent-500: var(--color-purple-500);
+    --accent-600: var(--color-purple-600);
+    --accent-700: var(--color-purple-700);
+    --accent-800: var(--color-purple-800);
+    --accent-900: var(--color-purple-900);
+  }
+  .theme-blue {
+    --accent-50: var(--color-blue-50);
+    --accent-100: var(--color-blue-100);
+    --accent-200: var(--color-blue-200);
+    --accent-300: var(--color-blue-300);
+    --accent-400: var(--color-blue-400);
+    --accent-500: var(--color-blue-500);
+    --accent-600: var(--color-blue-600);
+    --accent-700: var(--color-blue-700);
+    --accent-800: var(--color-blue-800);
+    --accent-900: var(--color-blue-900);
+  }
+  .theme-emerald {
+    --accent-50: var(--color-emerald-50);
+    --accent-100: var(--color-emerald-100);
+    --accent-200: var(--color-emerald-200);
+    --accent-300: var(--color-emerald-300);
+    --accent-400: var(--color-emerald-400);
+    --accent-500: var(--color-emerald-500);
+    --accent-600: var(--color-emerald-600);
+    --accent-700: var(--color-emerald-700);
+    --accent-800: var(--color-emerald-800);
+    --accent-900: var(--color-emerald-900);
+  }
+  .theme-rose {
+    --accent-50: var(--color-rose-50);
+    --accent-100: var(--color-rose-100);
+    --accent-200: var(--color-rose-200);
+    --accent-300: var(--color-rose-300);
+    --accent-400: var(--color-rose-400);
+    --accent-500: var(--color-rose-500);
+    --accent-600: var(--color-rose-600);
+    --accent-700: var(--color-rose-700);
+    --accent-800: var(--color-rose-800);
+    --accent-900: var(--color-rose-900);
+  }
+  .theme-amber {
+    --accent-50: var(--color-amber-50);
+    --accent-100: var(--color-amber-100);
+    --accent-200: var(--color-amber-200);
+    --accent-300: var(--color-amber-300);
+    --accent-400: var(--color-amber-400);
+    --accent-500: var(--color-amber-500);
+    --accent-600: var(--color-amber-600);
+    --accent-700: var(--color-amber-700);
+    --accent-800: var(--color-amber-800);
+    --accent-900: var(--color-amber-900);
+  }
+
+  :root {
+    /* ——— Светлая тема (по умолчанию) ——— */
+    /* Многоуровневые фоны: приложение → секция → карточка → вложенная → поле */
+    --surface-app: var(--color-slate-100);   /* фон приложения */
+    --surface-section: var(--color-slate-50); /* фон секции */
+    --surface: var(--color-white);            /* фон карточки */
+    --surface-2: var(--color-slate-50);       /* вложенная карточка / зебра */
+    --surface-3: var(--color-slate-100);      /* контрол / ячейка шапки */
+    --surface-4: var(--color-slate-200);      /* усиленный контрол */
+    --surface-input: var(--color-white);      /* поле ввода */
+    --surface-hover: var(--color-slate-100);  /* ховер */
+
+    /* Границы */
+    --border-subtle: var(--color-slate-100);
+    --border-base: var(--color-slate-200);
+    --border-strong: var(--color-slate-300);
+
+    /* Текст */
+    --text-primary: var(--color-slate-900);
+    --text-secondary: var(--color-slate-700);
+    --text-muted: var(--color-slate-500);
+    --text-faint: var(--color-slate-400);
+
+    /* Обратная совместимость со старыми переменными */
+    --background: var(--surface-app);
+    --foreground: var(--text-primary);
+    --sidebar-bg: var(--surface);
+    --border-color: var(--border-base);
+
+    --table-p: 1rem 1.5rem;
+    --table-text: 0.875rem;
+    --app-font-size: 16px;
+  }
+
+  .dark {
+    /* ——— Тёмная тема ——— */
+    --surface-app: var(--color-slate-950);
+    --surface-section: var(--color-slate-950);
+    --surface: var(--color-slate-900);
+    --surface-2: #0f1b31;                     /* чуть светлее фона приложения */
+    --surface-3: var(--color-slate-800);
+    --surface-4: var(--color-slate-700);
+    --surface-input: #0b1324;
+    --surface-hover: var(--color-slate-800);
+
+    --border-subtle: #1c2740;
+    --border-base: var(--color-slate-800);
+    --border-strong: var(--color-slate-700);
+
+    --text-primary: var(--color-slate-100);
+    --text-secondary: var(--color-slate-300);
+    --text-muted: var(--color-slate-400);
+    --text-faint: var(--color-slate-500);
+
+    --background: var(--surface-app);
+    --foreground: var(--text-primary);
+    --sidebar-bg: var(--surface);
+    --border-color: var(--border-base);
+  }
+  
+  .density-compact {
+    --table-p: 0.5rem 1rem;
+    --table-text: 0.75rem;
+  }
+  .density-standard {
+    --table-p: 1rem 1.5rem;
+    --table-text: 0.875rem;
+  }
+  .density-spacious {
+    --table-p: 1.5rem 2rem;
+    --table-text: 1rem;
+  }
+
+  .text-size-small { --app-font-size: 14px; }
+  .text-size-standard { --app-font-size: 16px; }
+  .text-size-large { --app-font-size: 18px; }
+
+  html {
+    font-size: var(--app-font-size);
+  }
+  
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+
+  /* Читаемые placeholder'ы в обеих темах */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--text-faint);
+    opacity: 1;
+  }
+
+  /* Плейсхолдер-опция в нативных select */
+  select:invalid,
+  option[value=""] {
+    color: var(--text-faint);
+  }
+}
+
+@layer components {
+  .p-table {
+    padding: var(--table-p);
+  }
+  .text-table {
+    font-size: var(--table-text);
+  }
+
+  /* Графики Recharts — цвета осей и сетки по токенам темы */
+  .recharts-cartesian-axis-tick-value,
+  .recharts-text.recharts-cartesian-axis-tick-value tspan {
+    fill: var(--text-muted);
+  }
+  .recharts-cartesian-grid line,
+  .recharts-cartesian-axis line,
+  .recharts-cartesian-axis-tick line {
+    stroke: var(--border-base);
+  }
+  .recharts-tooltip-wrapper .recharts-default-tooltip {
+    background-color: var(--surface) !important;
+    border-color: var(--border-base) !important;
+    color: var(--text-primary);
+    border-radius: 0.75rem;
+  }
+
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+    body, .print-container {
+      background-color: white !important;
+      color: black !important;
+    }
+    .print-only {
+      display: block !important;
+    }
+  }
+}
