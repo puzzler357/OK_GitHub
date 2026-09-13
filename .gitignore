@@ -1,0 +1,19 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Артефакты тестов
+tests/.tmp/
+playwright-report/
+test-results/
+
+# Локальный архив-снапшот проекта
+OK.zip
+
+# Локальные базы SQLite (рабочие данные, не код)
+*.db
